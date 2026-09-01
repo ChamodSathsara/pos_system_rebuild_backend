@@ -1,0 +1,56 @@
+﻿# .gitignore D:\GestetnerProjects\rebuild Pos web solution\backend\PosApi\.gitignore
+
+# Visual Studio
+.vs/
+.vscode/
+*.sln.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# User-specific files
+*.rsuser
+appsettings.Development.json
+
+# Build folder
+.vs/
+.vscode/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node modules (if using any frontend tools)
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Temp files
+*.tmp
+*.bak
+*~
