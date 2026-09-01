@@ -11,4 +11,8 @@ public interface IStockMovementRepository : IGenericRepository<StockMovement, lo
         CancellationToken cancellationToken = default);
 
     Task<StockMovement?> GetLatestForBatchAsync(long batchId, CancellationToken cancellationToken = default);
+
+    Task<bool> HasOpeningStockAsync(
+        int stockId,
+        CancellationToken cancellationToken = default);
 }

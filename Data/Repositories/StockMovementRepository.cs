@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using PosApi.Models.Entities;
+using PosApi.Models.Enums;
 using PosApi.Repository;
+
 
 namespace PosApi.Data.Repositories;
 
@@ -42,5 +44,16 @@ public class StockMovementRepository : GenericRepository<StockMovement, long>, I
             .Where(m => m.BatchId == batchId)
             .OrderByDescending(m => m.MovementId)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasOpeningStockAsync(
+    int stockId,
+    CancellationToken cancellationToken = default)
+    {
+        return await DbSet.AnyAsync(
+            movement =>
+                movement.StockId == stockId &&
+                movement.ReferenceType == StockReferenceType.OpeningStock,
+            cancellationToken);
     }
 }
