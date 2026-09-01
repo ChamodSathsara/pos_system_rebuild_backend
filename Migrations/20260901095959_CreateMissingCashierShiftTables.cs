@@ -79,7 +79,7 @@ namespace PosApi.Migrations
                 {
                     table.PrimaryKey(
                         name: "PK_cashier_shift",
-                        column: x => x.shift_id);
+                        columns: x => x.shift_id);
 
                     table.ForeignKey(
                         name: "FK_cashier_shift_branch_branch_code",
@@ -163,7 +163,7 @@ namespace PosApi.Migrations
                 {
                     table.PrimaryKey(
                         name: "PK_cashier_shift_history",
-                        column: x => x.history_id);
+                        columns: x => x.history_id);
 
                     table.ForeignKey(
                         name: "FK_cashier_shift_history_cashier_shift_shift_id",
