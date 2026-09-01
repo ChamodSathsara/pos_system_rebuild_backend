@@ -14,4 +14,12 @@ public interface IStockInventoryRepository : IGenericRepository<StockInventory, 
         string? warehouseCode,
         bool onlyBelowReorderLevel,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StockInventory>> GetPosItemsAsync(
+    string branchCode,
+    string? warehouseCode,
+    int? categoryId,
+    string? keyword,
+    bool onlyAvailable,
+    CancellationToken cancellationToken = default);
 }

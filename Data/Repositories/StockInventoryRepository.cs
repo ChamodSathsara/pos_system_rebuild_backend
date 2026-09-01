@@ -55,4 +55,68 @@ public class StockInventoryRepository : GenericRepository<StockInventory, int>, 
 
         return await query.OrderBy(s => s.ItemCode).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<StockInventory>> GetPosItemsAsync(
+    string branchCode,
+    string? warehouseCode,
+    int? categoryId,
+    string? keyword,
+    bool onlyAvailable,
+    CancellationToken cancellationToken = default)
+    {
+        var query = DbSet
+            .AsNoTracking()
+            .Include(stock => stock.Product)
+                .ThenInclude(product => product!.Category)
+            .Include(stock => stock.Product)
+                .ThenInclude(product => product!.Brand)
+            .Include(stock => stock.Product)
+                .ThenInclude(product => product!.Tax)
+            .Where(stock =>
+                stock.BranchCode == branchCode &&
+                stock.Product != null &&
+                stock.Product.IsActive &&
+                stock.Product.SellingPrice.HasValue)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(warehouseCode))
+        {
+            var normalizedWarehouseCode =
+                warehouseCode.Trim();
+
+            query = query.Where(stock =>
+                stock.WarehouseCode ==
+                normalizedWarehouseCode);
+        }
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(stock =>
+                stock.Product!.CategoryId ==
+                categoryId.Value);
+        }
+
+        if (onlyAvailable)
+        {
+            query = query.Where(stock =>
+                stock.CurrentQty > 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var searchTerm = keyword.Trim();
+
+            query = query.Where(stock =>
+                stock.Product!.ItemCode.Contains(searchTerm) ||
+                stock.Product.ItemName.Contains(searchTerm) ||
+                (
+                    stock.Product.Barcode != null &&
+                    stock.Product.Barcode.Contains(searchTerm)
+                ));
+        }
+
+        return await query
+            .OrderBy(stock => stock.Product!.ItemName)
+            .ToListAsync(cancellationToken);
+    }
 }

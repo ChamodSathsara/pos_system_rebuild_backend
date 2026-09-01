@@ -150,6 +150,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
+        services.AddScoped<IPosTerminalService,PosTerminalService>();
+
         services.AddAutoMapper(typeof(Mappings.MappingProfile).Assembly);
 
         return services;
