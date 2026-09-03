@@ -88,6 +88,11 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        //reports
+        services.AddScoped<
+    IOperationalReportRepository,
+    OperationalReportRepository>();
+
         return services;
     }
 
@@ -153,6 +158,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPosTerminalService,PosTerminalService>();
 
         services.AddAutoMapper(typeof(Mappings.MappingProfile).Assembly);
+
+        services.AddScoped<
+    IOperationalReportService,
+    OperationalReportService>();
 
         return services;
     }

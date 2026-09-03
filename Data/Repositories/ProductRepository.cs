@@ -28,24 +28,32 @@ public class ProductRepository : GenericRepository<ProductMaster, string>, IProd
         return await Context.Set<StockInventory>().AsNoTracking().AnyAsync(s => s.ItemCode == itemCode, cancellationToken);
     }
 
-    public async Task<string> GenerateNextItemCodeAsync(CancellationToken cancellationToken = default)
+    public async Task<string> GenerateNextItemCodeAsync(
+    CancellationToken cancellationToken = default)
     {
-        var lastCode = await DbSet
+        var itemCodes = await DbSet
             .AsNoTracking()
-            .Where(p => p.ItemCode.StartsWith(CodePrefix))
-            .OrderByDescending(p => p.ItemCode)
-            .Select(p => p.ItemCode)
-            .FirstOrDefaultAsync(cancellationToken);
+            .Where(product =>
+                product.ItemCode.StartsWith(CodePrefix))
+            .Select(product => product.ItemCode)
+            .ToListAsync(cancellationToken);
 
-        var nextSequence = 1;
-        if (lastCode is not null && lastCode.Length > CodePrefix.Length)
-        {
-            var numericPart = lastCode[CodePrefix.Length..];
-            if (int.TryParse(numericPart, out var parsed))
+        var maximumSequence = itemCodes
+            .Select(itemCode =>
             {
-                nextSequence = parsed + 1;
-            }
-        }
+                var numericPart =
+                    itemCode[CodePrefix.Length..];
+
+                return int.TryParse(
+                    numericPart,
+                    out var parsed)
+                        ? parsed
+                        : 0;
+            })
+            .DefaultIfEmpty(0)
+            .Max();
+
+        var nextSequence = maximumSequence + 1;
 
         return $"{CodePrefix}{nextSequence:D5}";
     }
