@@ -296,11 +296,13 @@ public class DamageItemService : IDamageItemService
             await _unitOfWork.ExpenseCategories.AddAsync(category, cancellationToken);
         }
 
+        var isNewCategory = category.CategoryId == 0;
         await _unitOfWork.Expenses.AddAsync(new Expense
         {
             DamageId = damageItem.DamageId,
             BranchCode = damageItem.BranchCode,
-            Category = category,
+            CategoryId = isNewCategory ? null : category.CategoryId,
+            Category = isNewCategory ? category : null,
             Amount = damageItem.CostAmount ?? 0,
             ExpenseDate = DateOnly.FromDateTime(damageItem.DamageDate ?? DateTime.UtcNow),
             Description = $"Damage DMG-{damageItem.DamageId}: {damageItem.ItemCode} - {damageItem.Reason}",
