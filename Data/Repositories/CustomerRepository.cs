@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using PosApi.Models.Entities;
 using PosApi.Repository;
@@ -19,23 +20,30 @@ public class CustomerRepository : GenericRepository<Customer, string>, ICustomer
 
     public async Task<string> GenerateNextCustomerCodeAsync(CancellationToken cancellationToken = default)
     {
-        var lastCode = await DbSet
-            .AsNoTracking()
-            .Where(c => c.CustomerCode.StartsWith(CodePrefix))
-            .OrderByDescending(c => c.CustomerCode)
-            .Select(c => c.CustomerCode)
-            .FirstOrDefaultAsync(cancellationToken);
+        // SQL Server sequences are atomic, so simultaneous POS requests can never receive
+        // the same customer code. The previous MAX+1 approach had a race condition.
+        var connection = Context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
 
-        var nextSequence = 1;
-        if (lastCode is not null && lastCode.Length > CodePrefix.Length)
+        try
         {
-            var numericPart = lastCode[CodePrefix.Length..];
-            if (int.TryParse(numericPart, out var parsed))
+            if (shouldClose)
             {
-                nextSequence = parsed + 1;
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT NEXT VALUE FOR dbo.customer_code_sequence";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var nextSequence = Convert.ToInt32(result);
+            return $"{CodePrefix}{nextSequence:D5}";
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
             }
         }
-
-        return $"{CodePrefix}{nextSequence:D5}";
     }
 }
