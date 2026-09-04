@@ -207,7 +207,10 @@ public class CashierShiftService : ICashierShiftService
             shift.BranchCode, categoryId: null, paidBy: shift.CashierCode,
             fromDate: DateOnly.FromDateTime(fromDate), toDate: DateOnly.FromDateTime(toDate),
             cancellationToken);
-        var cashExpensesTotal = expenses.Sum(e => e.Amount ?? 0);
+        // Damage write-offs are accounting expenses, not cash paid out of the drawer.
+        var cashExpensesTotal = expenses
+            .Where(e => !e.DamageId.HasValue)
+            .Sum(e => e.Amount ?? 0);
 
         return Math.Round(shift.OpeningCash + cashSalesTotal - cashExpensesTotal, 2);
     }

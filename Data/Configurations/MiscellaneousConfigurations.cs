@@ -178,6 +178,7 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.ToTable("expense");
         builder.HasKey(x => x.ExpenseId);
         builder.Property(x => x.ExpenseId).HasColumnName("expense_id").ValueGeneratedOnAdd();
+        builder.Property(x => x.DamageId).HasColumnName("damage_id");
         builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
         builder.Property(x => x.CategoryId).HasColumnName("category_id");
         builder.Property(x => x.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)");
@@ -189,6 +190,11 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchCode).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Category).WithMany(x => x.Expenses).HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.PaidByUser).WithMany().HasForeignKey(x => x.PaidBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.DamageItem)
+            .WithOne(x => x.Expense)
+            .HasForeignKey<Expense>(x => x.DamageId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(x => x.DamageId).IsUnique();
     }
 }
 

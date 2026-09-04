@@ -12,6 +12,7 @@ namespace PosApi.Service;
 
 public class DamageItemService : IDamageItemService
 {
+    private const string DamageExpenseCategoryName = "Damaged Stock";
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ILogger<DamageItemService> _logger;
@@ -78,6 +79,21 @@ public class DamageItemService : IDamageItemService
                 $"Insufficient stock for item '{product.ItemCode}' at branch '{branch.BranchCode}': requested {request.Quantity}, only {availableQty} available.");
         }
 
+        var remainingForCost = request.Quantity;
+        var fifoCost = 0m;
+        foreach (var batch in batches)
+        {
+            if (remainingForCost <= 0) break;
+            var take = Math.Min(remainingForCost, batch.AvailableQty);
+            fifoCost += take * batch.UnitCost;
+            remainingForCost -= take;
+        }
+        var damageCost = request.CostAmount ?? fifoCost;
+        if (damageCost < 0)
+        {
+            throw new BadRequestException("Damage cost cannot be negative.");
+        }
+
         // ---- Insert damage_item first so subsequent stock_movement rows have a DamageId to
         // reference. ----
         var damageItem = new DamageItem
@@ -86,7 +102,7 @@ public class DamageItemService : IDamageItemService
             BranchCode = branch.BranchCode,
             WarehouseCode = request.WarehouseCode,
             Quantity = request.Quantity,
-            CostAmount = request.CostAmount,
+            CostAmount = damageCost,
             Reason = request.Reason,
             DamageDate = request.DamageDate ?? DateTime.UtcNow,
             ReportedBy = reportedBy,
@@ -170,6 +186,8 @@ public class DamageItemService : IDamageItemService
                 reportedBy),
             cancellationToken);
 
+        await CreateDamageExpenseAsync(damageItem, reportedBy, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
@@ -211,6 +229,7 @@ public class DamageItemService : IDamageItemService
         damageItem.Status = request.Status;
 
         _unitOfWork.DamageItems.Update(damageItem);
+        await SyncDamageExpenseAsync(damageItem, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Damage report {DamageId} updated to status {Status}", damageId, request.Status);
@@ -256,5 +275,59 @@ public class DamageItemService : IDamageItemService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Damage report {DamageId} deleted and reversed successfully", damageId);
+    }
+
+    private async Task CreateDamageExpenseAsync(
+        DamageItem damageItem,
+        string paidBy,
+        CancellationToken cancellationToken)
+    {
+        var categories = await _unitOfWork.ExpenseCategories.FindAsync(
+            x => x.CategoryName == DamageExpenseCategoryName,
+            cancellationToken);
+        var category = categories.FirstOrDefault();
+        if (category is null)
+        {
+            category = new ExpenseCategory
+            {
+                CategoryName = DamageExpenseCategoryName,
+                Description = "Automatically generated expenses for damaged stock."
+            };
+            await _unitOfWork.ExpenseCategories.AddAsync(category, cancellationToken);
+        }
+
+        await _unitOfWork.Expenses.AddAsync(new Expense
+        {
+            DamageId = damageItem.DamageId,
+            BranchCode = damageItem.BranchCode,
+            Category = category,
+            Amount = damageItem.CostAmount ?? 0,
+            ExpenseDate = DateOnly.FromDateTime(damageItem.DamageDate ?? DateTime.UtcNow),
+            Description = $"Damage DMG-{damageItem.DamageId}: {damageItem.ItemCode} - {damageItem.Reason}",
+            PaidBy = paidBy,
+            CreatedAt = DateTime.UtcNow
+        }, cancellationToken);
+    }
+
+    private async Task SyncDamageExpenseAsync(
+        DamageItem damageItem,
+        CancellationToken cancellationToken)
+    {
+        var expenses = await _unitOfWork.Expenses.FindAsync(
+            x => x.DamageId == damageItem.DamageId,
+            cancellationToken);
+        var expense = expenses.SingleOrDefault();
+
+        if (expense is null)
+        {
+            await CreateDamageExpenseAsync(damageItem, damageItem.ReportedBy ?? string.Empty, cancellationToken);
+            return;
+        }
+
+        expense.BranchCode = damageItem.BranchCode;
+        expense.Amount = damageItem.CostAmount ?? 0;
+        expense.ExpenseDate = DateOnly.FromDateTime(damageItem.DamageDate ?? DateTime.UtcNow);
+        expense.Description = $"Damage DMG-{damageItem.DamageId}: {damageItem.ItemCode} - {damageItem.Reason}";
+        _unitOfWork.Expenses.Update(expense);
     }
 }

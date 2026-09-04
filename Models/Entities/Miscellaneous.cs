@@ -19,6 +19,7 @@ public class DamageItem
     public Branch? Branch { get; set; }
     public Warehouse? Warehouse { get; set; }
     public SystemUser? ReportedByUser { get; set; }
+    public Expense? Expense { get; set; }
 }
 
 public class Discount
@@ -138,6 +139,7 @@ public class ExpenseCategory
 public class Expense
 {
     public int ExpenseId { get; set; }
+    public int? DamageId { get; set; }
     public string? BranchCode { get; set; }
     public int? CategoryId { get; set; }
     public decimal? Amount { get; set; }
@@ -149,6 +151,7 @@ public class Expense
     public Branch? Branch { get; set; }
     public ExpenseCategory? Category { get; set; }
     public SystemUser? PaidByUser { get; set; }
+    public DamageItem? DamageItem { get; set; }
 }
 
 /// <summary>

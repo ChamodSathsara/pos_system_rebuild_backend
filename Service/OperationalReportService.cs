@@ -341,6 +341,49 @@ public class OperationalReportService
         return report;
     }
 
+    public async Task<DamageItemReportDto> GetDamageItemsAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        string? branchCode,
+        string? warehouseCode,
+        string? itemCode,
+        DamageItemStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var (start, end) = ConvertRange(fromDate, toDate);
+        var damageItems = await _repository.GetDamageItemsAsync(
+            start, end, branchCode, warehouseCode, itemCode, status, cancellationToken);
+
+        var report = new DamageItemReportDto
+        {
+            FromDate = fromDate,
+            ToDate = toDate,
+            BranchCode = branchCode,
+            Items = damageItems.Select(x => new DamageItemReportLineDto
+            {
+                DamageId = x.DamageId,
+                DamageDate = x.DamageDate,
+                ItemCode = x.ItemCode,
+                ItemName = x.Product?.ItemName,
+                BranchCode = x.BranchCode,
+                BranchName = x.Branch?.BranchName,
+                WarehouseCode = x.WarehouseCode,
+                WarehouseName = x.Warehouse?.WarehouseName,
+                Quantity = x.Quantity ?? 0,
+                CostAmount = x.CostAmount ?? 0,
+                Reason = x.Reason,
+                ReportedBy = x.ReportedBy,
+                ReportedByName = x.ReportedByUser?.FullName,
+                Status = x.Status
+            }).ToList()
+        };
+
+        report.TotalDamageCount = report.Items.Count;
+        report.TotalQuantity = report.Items.Sum(x => x.Quantity);
+        report.TotalDamageCost = report.Items.Sum(x => x.CostAmount);
+        return report;
+    }
+
     public async Task<ProfitReportDto> GetProfitAsync(
         DateOnly fromDate,
         DateOnly toDate,

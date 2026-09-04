@@ -311,6 +311,35 @@ public static class OperationalReportPdfExporter
             summaries);
     }
 
+    public static byte[] ExportDamageItems(DamageItemReportDto report)
+    {
+        var rows = report.Items.Select(item => new[]
+        {
+            item.DamageDate?.ToString("dd/MM/yyyy", Culture) ?? string.Empty,
+            item.ItemCode ?? string.Empty,
+            item.ItemName ?? string.Empty,
+            item.BranchCode ?? string.Empty,
+            item.WarehouseCode ?? string.Empty,
+            FormatQty(item.Quantity),
+            Money(item.CostAmount),
+            item.Reason ?? string.Empty,
+            item.ReportedByName ?? item.ReportedBy ?? string.Empty,
+            item.Status.ToString()
+        }).ToList();
+
+        return GenerateReport(
+            "Damaged Items Report",
+            $"{report.FromDate:dd/MM/yyyy} - {report.ToDate:dd/MM/yyyy}",
+            new[] { "Date", "Code", "Item", "Branch", "Warehouse", "Qty", "Cost", "Reason", "Reported By", "Status" },
+            rows,
+            new Dictionary<string, string>
+            {
+                ["Damage Count"] = report.TotalDamageCount.ToString(Culture),
+                ["Total Quantity"] = FormatQty(report.TotalQuantity),
+                ["Total Damage Cost"] = Money(report.TotalDamageCost)
+            });
+    }
+
     private static byte[] GenerateReport(
         string title,
         string subtitle,

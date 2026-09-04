@@ -359,7 +359,58 @@ public class OperationalReportsController : BaseApiController
     }
 
     // =====================================================
-    // 5. PROFIT REPORT
+    // 5. DAMAGED ITEMS REPORT
+    // =====================================================
+
+    [HttpGet("damage-items")]
+    public async Task<IActionResult> GetDamageItemsJson(
+        [FromQuery] DateOnly fromDate,
+        [FromQuery] DateOnly toDate,
+        [FromQuery] string? branchCode,
+        [FromQuery] string? warehouseCode,
+        [FromQuery] string? itemCode,
+        [FromQuery] DamageItemStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await GetDamageItemReport(fromDate, toDate, branchCode,
+            warehouseCode, itemCode, status, cancellationToken);
+        return Ok(ApiResponse<DamageItemReportDto>.SuccessResponse(report));
+    }
+
+    [HttpGet("damage-items/pdf")]
+    public async Task<IActionResult> DownloadDamageItemsPdf(
+        [FromQuery] DateOnly fromDate,
+        [FromQuery] DateOnly toDate,
+        [FromQuery] string? branchCode,
+        [FromQuery] string? warehouseCode,
+        [FromQuery] string? itemCode,
+        [FromQuery] DamageItemStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await GetDamageItemReport(fromDate, toDate, branchCode,
+            warehouseCode, itemCode, status, cancellationToken);
+        return File(OperationalReportPdfExporter.ExportDamageItems(report), "application/pdf",
+            $"damage-items-{fromDate:yyyyMMdd}-{toDate:yyyyMMdd}.pdf");
+    }
+
+    [HttpGet("damage-items/excel")]
+    public async Task<IActionResult> DownloadDamageItemsExcel(
+        [FromQuery] DateOnly fromDate,
+        [FromQuery] DateOnly toDate,
+        [FromQuery] string? branchCode,
+        [FromQuery] string? warehouseCode,
+        [FromQuery] string? itemCode,
+        [FromQuery] DamageItemStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await GetDamageItemReport(fromDate, toDate, branchCode,
+            warehouseCode, itemCode, status, cancellationToken);
+        return File(OperationalReportExcelExporter.ExportDamageItems(report), ExcelContentType,
+            $"damage-items-{fromDate:yyyyMMdd}-{toDate:yyyyMMdd}.xlsx");
+    }
+
+    // =====================================================
+    // 6. PROFIT REPORT
     // =====================================================
 
     [HttpGet("profit")]
@@ -523,6 +574,20 @@ public class OperationalReportsController : BaseApiController
             toDate,
             ResolveBranch(branchCode),
             cancellationToken);
+    }
+
+    private Task<DamageItemReportDto> GetDamageItemReport(
+        DateOnly fromDate,
+        DateOnly toDate,
+        string? branchCode,
+        string? warehouseCode,
+        string? itemCode,
+        DamageItemStatus? status,
+        CancellationToken cancellationToken)
+    {
+        ValidateDates(fromDate, toDate);
+        return _service.GetDamageItemsAsync(fromDate, toDate, ResolveBranch(branchCode),
+            warehouseCode, itemCode, status, cancellationToken);
     }
 
     private string? ResolveBranch(

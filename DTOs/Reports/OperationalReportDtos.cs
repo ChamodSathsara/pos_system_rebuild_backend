@@ -201,3 +201,36 @@ public class ProfitReportDto
 
     public decimal GrossProfitMarginPercentage { get; set; }
 }
+
+// ========================================================
+// Damaged Items Report
+// ========================================================
+
+public class DamageItemReportLineDto
+{
+    public int DamageId { get; set; }
+    public DateTime? DamageDate { get; set; }
+    public string? ItemCode { get; set; }
+    public string? ItemName { get; set; }
+    public string? BranchCode { get; set; }
+    public string? BranchName { get; set; }
+    public string? WarehouseCode { get; set; }
+    public string? WarehouseName { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal CostAmount { get; set; }
+    public string? Reason { get; set; }
+    public string? ReportedBy { get; set; }
+    public string? ReportedByName { get; set; }
+    public DamageItemStatus Status { get; set; }
+}
+
+public class DamageItemReportDto
+{
+    public DateOnly FromDate { get; set; }
+    public DateOnly ToDate { get; set; }
+    public string? BranchCode { get; set; }
+    public List<DamageItemReportLineDto> Items { get; set; } = new();
+    public int TotalDamageCount { get; set; }
+    public decimal TotalQuantity { get; set; }
+    public decimal TotalDamageCost { get; set; }
+}

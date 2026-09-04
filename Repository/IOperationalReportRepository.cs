@@ -54,6 +54,15 @@ public interface IOperationalReportRepository
         string? paidBy,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DamageItem>> GetDamageItemsAsync(
+        DateTime fromDate,
+        DateTime toDate,
+        string? branchCode,
+        string? warehouseCode,
+        string? itemCode,
+        DamageItemStatus? status,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Sale>> GetSalesAsync(
         DateTime fromDate,
         DateTime toDate,

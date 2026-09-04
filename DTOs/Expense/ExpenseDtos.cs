@@ -29,6 +29,7 @@ public class UpdateExpenseDto
 public class ExpenseDto
 {
     public int ExpenseId { get; set; }
+    public int? DamageId { get; set; }
     public string? BranchCode { get; set; }
     public string? BranchName { get; set; }
     public int? CategoryId { get; set; }

@@ -314,6 +314,31 @@ public static class OperationalReportExcelExporter
             });
     }
 
+    public static byte[] ExportDamageItems(DamageItemReportDto report)
+    {
+        var headers = new[]
+        {
+            "Damage ID", "Date", "Item Code", "Item Name", "Branch", "Warehouse",
+            "Quantity", "Damage Cost", "Reason", "Reported By", "Status"
+        };
+        var rows = report.Items.Select(item => new object?[]
+        {
+            item.DamageId, item.DamageDate, item.ItemCode, item.ItemName,
+            item.BranchName ?? item.BranchCode, item.WarehouseName ?? item.WarehouseCode,
+            item.Quantity, item.CostAmount, item.Reason,
+            item.ReportedByName ?? item.ReportedBy, item.Status.ToString()
+        }).ToList();
+
+        return GenerateWorkbook("Damaged Items", headers, rows, new Dictionary<string, object?>
+        {
+            ["From Date"] = report.FromDate.ToString(),
+            ["To Date"] = report.ToDate.ToString(),
+            ["Damage Count"] = report.TotalDamageCount,
+            ["Total Quantity"] = report.TotalQuantity,
+            ["Total Damage Cost"] = report.TotalDamageCost
+        });
+    }
+
     private static byte[] GenerateWorkbook(
         string sheetName,
         IReadOnlyList<string> headers,

@@ -308,6 +308,39 @@ public class OperationalReportRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DamageItem>> GetDamageItemsAsync(
+        DateTime fromDate,
+        DateTime toDate,
+        string? branchCode,
+        string? warehouseCode,
+        string? itemCode,
+        DamageItemStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Set<DamageItem>()
+            .AsNoTracking()
+            .Include(x => x.Product)
+            .Include(x => x.Branch)
+            .Include(x => x.Warehouse)
+            .Include(x => x.ReportedByUser)
+            .Where(x => x.DamageDate >= fromDate && x.DamageDate <= toDate)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(branchCode))
+            query = query.Where(x => x.BranchCode == branchCode);
+        if (!string.IsNullOrWhiteSpace(warehouseCode))
+            query = query.Where(x => x.WarehouseCode == warehouseCode);
+        if (!string.IsNullOrWhiteSpace(itemCode))
+            query = query.Where(x => x.ItemCode == itemCode);
+        if (status.HasValue)
+            query = query.Where(x => x.Status == status.Value);
+
+        return await query
+            .OrderByDescending(x => x.DamageDate)
+            .ThenByDescending(x => x.DamageId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Sale>> GetSalesAsync(
         DateTime fromDate,
         DateTime toDate,

@@ -42,6 +42,15 @@ public interface IOperationalReportService
         string? paidBy,
         CancellationToken cancellationToken = default);
 
+    Task<DamageItemReportDto> GetDamageItemsAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        string? branchCode,
+        string? warehouseCode,
+        string? itemCode,
+        DamageItemStatus? status,
+        CancellationToken cancellationToken = default);
+
     Task<ProfitReportDto> GetProfitAsync(
         DateOnly fromDate,
         DateOnly toDate,
