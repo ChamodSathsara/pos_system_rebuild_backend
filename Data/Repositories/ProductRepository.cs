@@ -106,4 +106,20 @@ public class ProductRepository : GenericRepository<ProductMaster, string>, IProd
             .Include(p => p.Tax)
             .FirstOrDefaultAsync(p => p.ItemCode == itemCode, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ProductMaster>> GetByIdsWithDetailsAsync(
+        IReadOnlyCollection<string> itemCodes,
+        CancellationToken cancellationToken = default)
+    {
+        if (itemCodes.Count == 0)
+        {
+            return Array.Empty<ProductMaster>();
+        }
+
+        return await DbSet
+            .AsNoTracking()
+            .Include(p => p.Tax)
+            .Where(p => itemCodes.Contains(p.ItemCode))
+            .ToListAsync(cancellationToken);
+    }
 }

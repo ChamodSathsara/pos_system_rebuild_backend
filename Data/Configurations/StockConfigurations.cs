@@ -41,6 +41,8 @@ public class StockBatchConfiguration : IEntityTypeConfiguration<StockBatch>
         builder.Property(x => x.ReceivedDate).HasColumnName("received_date").IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(20).IsRequired();
 
+        builder.HasIndex(x => new { x.StockId, x.Status, x.ReceivedDate });
+
         builder.HasOne(x => x.StockInventory).WithMany(x => x.Batches).HasForeignKey(x => x.StockId).OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -54,9 +54,10 @@ public class SaleService : ISaleService
             throw new BadRequestException($"Branch '{request.BranchCode}' does not exist.");
         }
 
+        Customer? customer = null;
         if (!string.IsNullOrWhiteSpace(request.CustomerCode))
         {
-            var customer = await _unitOfWork.Customers.GetByIdAsync(request.CustomerCode, cancellationToken)
+            customer = await _unitOfWork.Customers.GetByIdAsync(request.CustomerCode, cancellationToken)
                 ?? throw new NotFoundException("Customer", request.CustomerCode);
 
             if (!customer.IsActive)
@@ -83,6 +84,13 @@ public class SaleService : ISaleService
         decimal lineDiscountTotal = 0;
         decimal taxTotal = 0;
 
+        var itemCodes = request.Items
+            .Select(x => x.ItemCode.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var products = (await _unitOfWork.Products.GetByIdsWithDetailsAsync(itemCodes, cancellationToken))
+            .ToDictionary(x => x.ItemCode, StringComparer.OrdinalIgnoreCase);
+
         foreach (var line in request.Items)
         {
             if (line.Quantity <= 0)
@@ -90,8 +98,11 @@ public class SaleService : ISaleService
                 throw new BadRequestException($"Quantity for item '{line.ItemCode}' must be greater than zero.");
             }
 
-            var product = await _unitOfWork.Products.GetByIdWithDetailsAsync(line.ItemCode, cancellationToken)
-                ?? throw new BadRequestException($"Product '{line.ItemCode}' does not exist.");
+            var normalizedItemCode = line.ItemCode.Trim();
+            if (!products.TryGetValue(normalizedItemCode, out var product))
+            {
+                throw new BadRequestException($"Product '{line.ItemCode}' does not exist.");
+            }
 
             if (!product.IsActive)
             {
@@ -118,7 +129,7 @@ public class SaleService : ISaleService
 
             saleItems.Add(new SaleItem
             {
-                ItemCode = line.ItemCode,
+                ItemCode = product.ItemCode,
                 Quantity = line.Quantity,
                 UnitPrice = unitPrice,
                 DiscountAmount = lineDiscount,
@@ -136,9 +147,22 @@ public class SaleService : ISaleService
         }
 
         // ---- 3. Draw down stock FIFO across the branch's available batches for every line ----
+        var availableBatches = await _unitOfWork.StockBatches
+            .GetAvailableBatchesByItemsAndBranchAsync(itemCodes, request.BranchCode, cancellationToken);
+        var batchesByItem = availableBatches
+            .GroupBy(x => x.StockInventory!.ItemCode!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => (IReadOnlyList<StockBatch>)x.ToList(), StringComparer.OrdinalIgnoreCase);
+
         foreach (var saleItem in saleItems)
         {
-            await ConsumeStockFifoAsync(saleItem.ItemCode!, request.BranchCode, saleItem.Quantity ?? 0, invoiceNo, createdBy, cancellationToken);
+            batchesByItem.TryGetValue(saleItem.ItemCode!, out var batches);
+            await ConsumeStockFifoAsync(
+                saleItem.ItemCode!,
+                saleItem.Quantity ?? 0,
+                invoiceNo,
+                createdBy,
+                batches ?? Array.Empty<StockBatch>(),
+                cancellationToken);
         }
 
         // ---- 4. Insert sale / sale_item ----
@@ -147,6 +171,7 @@ public class SaleService : ISaleService
             InvoiceNo = invoiceNo,
             BranchCode = request.BranchCode,
             CustomerCode = string.IsNullOrWhiteSpace(request.CustomerCode) ? null : request.CustomerCode,
+            Customer = customer,
             SaleDate = saleDate,
             Subtotal = subtotal,
             DiscountAmount = totalDiscount,
@@ -193,11 +218,18 @@ public class SaleService : ISaleService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        foreach (var saleItem in saleItems)
+        {
+            saleItem.Product = products[saleItem.ItemCode!];
+        }
+
         _logger.LogInformation(
             "Sale {InvoiceNo} posted for branch {BranchCode}: {ItemCount} item(s), total {Total:N2}",
             invoiceNo, request.BranchCode, saleItems.Count, totalAmount);
 
-        return await GetByIdAsync(invoiceNo, cancellationToken);
+        // The complete aggregate is already tracked in memory; avoid reloading it from the
+        // database immediately after SaveChanges. Generated line IDs are populated by EF.
+        return _mapper.Map<SaleDto>(sale);
     }
 
     public async Task<SaleInvoiceDto> GetInvoiceAsync(string invoiceNo, CancellationToken cancellationToken = default)
@@ -358,18 +390,16 @@ public class SaleService : ISaleService
     /// <summary>Draws down the given quantity of an item FIFO across the branch's available batches, raising a stock-out movement for each batch touched.</summary>
     private async Task ConsumeStockFifoAsync(
         string itemCode,
-        string branchCode,
         decimal quantity,
         string invoiceNo,
         string createdBy,
+        IReadOnlyList<StockBatch> batches,
         CancellationToken cancellationToken)
     {
-        var batches = await _unitOfWork.StockBatches.GetAvailableBatchesByItemAndBranchAsync(itemCode, branchCode, cancellationToken);
-
         if (batches.Sum(b => b.AvailableQty) < quantity)
         {
             throw new BadRequestException(
-                $"Insufficient stock for item '{itemCode}' at branch '{branchCode}': requested {quantity}, only {batches.Sum(b => b.AvailableQty)} available.");
+                $"Insufficient stock for item '{itemCode}': requested {quantity}, only {batches.Sum(b => b.AvailableQty)} available.");
         }
 
         var remaining = quantity;

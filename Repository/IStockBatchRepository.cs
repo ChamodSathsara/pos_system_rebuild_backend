@@ -18,4 +18,10 @@ public interface IStockBatchRepository : IGenericRepository<StockBatch, long>
     /// down stock FIFO when posting a sale.
     /// </summary>
     Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemAndBranchAsync(string itemCode, string branchCode, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads tracked FIFO batches for every requested item in one database query.</summary>
+    Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemsAndBranchAsync(
+        IReadOnlyCollection<string> itemCodes,
+        string branchCode,
+        CancellationToken cancellationToken = default);
 }

@@ -50,4 +50,26 @@ public class StockBatchRepository : GenericRepository<StockBatch, long>, IStockB
             .OrderBy(b => b.ReceivedDate)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemsAndBranchAsync(
+        IReadOnlyCollection<string> itemCodes,
+        string branchCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (itemCodes.Count == 0)
+        {
+            return Array.Empty<StockBatch>();
+        }
+
+        return await DbSet
+            .Include(b => b.StockInventory)
+            .Where(b => b.AvailableQty > 0
+                && b.Status == BatchStatus.Available
+                && b.StockInventory != null
+                && itemCodes.Contains(b.StockInventory.ItemCode!)
+                && b.StockInventory.BranchCode == branchCode)
+            .OrderBy(b => b.ReceivedDate)
+            .ThenBy(b => b.BatchId)
+            .ToListAsync(cancellationToken);
+    }
 }

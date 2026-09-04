@@ -21,4 +21,9 @@ public interface IProductRepository : IGenericRepository<ProductMaster, string>
         CancellationToken cancellationToken = default);
 
     Task<ProductMaster?> GetByIdWithDetailsAsync(string itemCode, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads all requested products and tax details in one database query.</summary>
+    Task<IReadOnlyList<ProductMaster>> GetByIdsWithDetailsAsync(
+        IReadOnlyCollection<string> itemCodes,
+        CancellationToken cancellationToken = default);
 }
