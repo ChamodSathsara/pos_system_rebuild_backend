@@ -101,7 +101,8 @@ public enum UnitOfMeasure
     CM,
     PACK,
     BOX,
-    DOZEN
+    DOZEN,
+    BOTTLE
 }
 
 public enum GrnReturnStatus
