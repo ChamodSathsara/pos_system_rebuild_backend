@@ -13,7 +13,7 @@ public class CreateProductValidator : AbstractValidator<CreateProductDto>
         RuleFor(x => x.CategoryId).GreaterThan(0).When(x => x.CategoryId.HasValue);
         RuleFor(x => x.BrandId).GreaterThan(0).When(x => x.BrandId.HasValue);
         RuleFor(x => x.UnitOfMeasure).IsInEnum();
-        RuleFor(x => x.ItemGroup).IsInEnum();
+        RuleFor(x => x.ItemGroup).IsInEnum().When(x => x.ItemGroup.HasValue);
         RuleFor(x => x.Barcode).MaximumLength(50);
         RuleFor(x => x.CostPrice).GreaterThanOrEqualTo(0).When(x => x.CostPrice.HasValue);
         RuleFor(x => x.SellingPrice).GreaterThanOrEqualTo(0).When(x => x.SellingPrice.HasValue);
@@ -31,7 +31,7 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductDto>
         RuleFor(x => x.CategoryId).GreaterThan(0).When(x => x.CategoryId.HasValue);
         RuleFor(x => x.BrandId).GreaterThan(0).When(x => x.BrandId.HasValue);
         RuleFor(x => x.UnitOfMeasure).IsInEnum();
-        RuleFor(x => x.ItemGroup).IsInEnum();
+        RuleFor(x => x.ItemGroup).IsInEnum().When(x => x.ItemGroup.HasValue);
         RuleFor(x => x.Barcode).MaximumLength(50);
         RuleFor(x => x.CostPrice).GreaterThanOrEqualTo(0).When(x => x.CostPrice.HasValue);
         RuleFor(x => x.SellingPrice).GreaterThanOrEqualTo(0).When(x => x.SellingPrice.HasValue);

@@ -44,7 +44,7 @@ public class ProductMaster
     public int? CategoryId { get; set; }
     public int? BrandId { get; set; }
     public UnitOfMeasure UnitOfMeasure { get; set; }
-    public ItemGroup ItemGroup { get; set; }
+    public ItemGroup? ItemGroup { get; set; }
     public string? Barcode { get; set; }
     public decimal? CostPrice { get; set; }
     public decimal? SellingPrice { get; set; }

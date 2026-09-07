@@ -62,7 +62,7 @@ public class ProductMasterConfiguration : IEntityTypeConfiguration<ProductMaster
         builder.Property(x => x.CategoryId).HasColumnName("category_id");
         builder.Property(x => x.BrandId).HasColumnName("brand_id");
         builder.Property(x => x.UnitOfMeasure).HasColumnName("unit_of_measure").HasConversion<string>().HasMaxLength(10).IsRequired();
-        builder.Property(x => x.ItemGroup).HasColumnName("item_group").HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ItemGroup).HasColumnName("item_group").HasConversion<string>().HasMaxLength(20);
         builder.Property(x => x.Barcode).HasColumnName("barcode").HasMaxLength(100);
         builder.Property(x => x.CostPrice).HasColumnName("cost_price").HasColumnType("decimal(18,2)");
         builder.Property(x => x.SellingPrice).HasColumnName("selling_price").HasColumnType("decimal(18,2)");
