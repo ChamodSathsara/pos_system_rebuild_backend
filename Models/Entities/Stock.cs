@@ -26,6 +26,7 @@ public class StockBatch
     public decimal ReceivedQty { get; set; }
     public decimal AvailableQty { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal? SellingPrice { get; set; }
     public DateOnly? ExpiryDate { get; set; }
     public DateTime ReceivedDate { get; set; }
     public BatchStatus Status { get; set; }

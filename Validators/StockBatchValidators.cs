@@ -11,6 +11,9 @@ public class CreateStockBatchValidator : AbstractValidator<CreateStockBatchDto>
         RuleFor(x => x.BatchNo).NotEmpty().MaximumLength(50);
         RuleFor(x => x.ReceivedQty).GreaterThan(0).WithMessage("Received quantity must be greater than zero.");
         RuleFor(x => x.UnitCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.SellingPrice)
+            .GreaterThan(0)
+            .When(x => x.SellingPrice.HasValue);
         RuleFor(x => x.ReferenceType).IsInEnum();
         RuleFor(x => x.ReferenceNo).MaximumLength(50);
         RuleFor(x => x.Remarks).MaximumLength(500);
@@ -25,5 +28,15 @@ public class UpdateStockBatchValidator : AbstractValidator<UpdateStockBatchDto>
         RuleFor(x => x.UnitCost).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Status).IsInEnum();
         RuleFor(x => x.Remarks).MaximumLength(500);
+    }
+}
+
+public class UpdateBatchSellingPriceValidator : AbstractValidator<UpdateBatchSellingPriceDto>
+{
+    public UpdateBatchSellingPriceValidator()
+    {
+        RuleFor(x => x.SellingPrice)
+            .GreaterThan(0)
+            .WithMessage("Selling price must be greater than zero.");
     }
 }

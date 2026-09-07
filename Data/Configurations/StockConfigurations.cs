@@ -37,6 +37,7 @@ public class StockBatchConfiguration : IEntityTypeConfiguration<StockBatch>
         builder.Property(x => x.ReceivedQty).HasColumnName("received_qty").HasColumnType("decimal(18,3)").IsRequired();
         builder.Property(x => x.AvailableQty).HasColumnName("available_qty").HasColumnType("decimal(18,3)").IsRequired();
         builder.Property(x => x.UnitCost).HasColumnName("unit_cost").HasColumnType("decimal(18,2)").IsRequired();
+        builder.Property(x => x.SellingPrice).HasColumnName("selling_price").HasColumnType("decimal(18,2)");
         builder.Property(x => x.ExpiryDate).HasColumnName("expiry_date");
         builder.Property(x => x.ReceivedDate).HasColumnName("received_date").IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(20).IsRequired();

@@ -71,6 +71,22 @@ public class StockBatchesController : BaseApiController
         return Ok(ApiResponse<StockBatchDto>.SuccessResponse(batch, "Stock batch updated successfully."));
     }
 
+    /// <summary>Changes the selling price of one specific stock batch.</summary>
+    [HttpPatch("{batchId:long}/selling-price")]
+    [ProducesResponseType(typeof(ApiResponse<StockBatchDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSellingPrice(
+        long batchId,
+        [FromBody] UpdateBatchSellingPriceDto request,
+        CancellationToken cancellationToken)
+    {
+        var batch = await _stockBatchService.UpdateSellingPriceAsync(
+            batchId, request, CurrentUserCode, cancellationToken);
+        return Ok(ApiResponse<StockBatchDto>.SuccessResponse(
+            batch, "Batch selling price updated successfully."));
+    }
+
     /// <summary>Deletes a batch. Only allowed while it is untouched (nothing consumed or adjusted against it yet).</summary>
     [HttpDelete("{batchId:long}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]

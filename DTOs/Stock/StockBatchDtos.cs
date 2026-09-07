@@ -9,6 +9,7 @@ public class CreateStockBatchDto
     public string BatchNo { get; set; } = string.Empty;
     public decimal ReceivedQty { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal? SellingPrice { get; set; }
     public DateOnly? ExpiryDate { get; set; }
     public DateTime? ReceivedDate { get; set; }
     public string? ReferenceNo { get; set; }
@@ -38,7 +39,13 @@ public class StockBatchDto
     public decimal ReceivedQty { get; set; }
     public decimal AvailableQty { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal? SellingPrice { get; set; }
     public DateOnly? ExpiryDate { get; set; }
     public DateTime ReceivedDate { get; set; }
     public BatchStatus Status { get; set; }
+}
+
+public class UpdateBatchSellingPriceDto
+{
+    public decimal SellingPrice { get; set; }
 }

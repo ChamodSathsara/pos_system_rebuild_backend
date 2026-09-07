@@ -59,6 +59,7 @@ public class StockBatchService : IStockBatchService
             ReceivedQty = request.ReceivedQty,
             AvailableQty = request.ReceivedQty,
             UnitCost = request.UnitCost,
+            SellingPrice = request.SellingPrice,
             ExpiryDate = request.ExpiryDate,
             ReceivedDate = request.ReceivedDate ?? DateTime.UtcNow,
             Status = BatchStatus.Available
@@ -170,6 +171,38 @@ public class StockBatchService : IStockBatchService
 
         _unitOfWork.StockBatches.Update(batch);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return _mapper.Map<StockBatchDto>(batch);
+    }
+
+    public async Task<StockBatchDto> UpdateSellingPriceAsync(
+        long batchId,
+        UpdateBatchSellingPriceDto request,
+        string updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var batch = await _unitOfWork.StockBatches.GetByIdAsync(batchId, cancellationToken)
+            ?? throw new NotFoundException("StockBatch", batchId);
+        var stock = await _unitOfWork.StockInventories.GetByIdAsync(batch.StockId, cancellationToken)
+            ?? throw new NotFoundException("StockInventory", batch.StockId);
+
+        var previousPrice = batch.SellingPrice;
+        batch.SellingPrice = request.SellingPrice;
+        _unitOfWork.StockBatches.Update(batch);
+
+        await _unitOfWork.ItemLogs.AddAsync(
+            ItemLogFactory.Create(
+                stock.ItemCode,
+                ItemLogActions.PriceChanged,
+                $"Batch {batch.BatchNo}: {previousPrice?.ToString("0.00") ?? "not set"}",
+                $"Batch {batch.BatchNo}: {request.SellingPrice:0.00}",
+                updatedBy),
+            cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Selling price for batch {BatchId} ({BatchNo}) changed from {OldPrice} to {NewPrice} by {UpdatedBy}",
+            batch.BatchId, batch.BatchNo, previousPrice, request.SellingPrice, updatedBy);
 
         return _mapper.Map<StockBatchDto>(batch);
     }

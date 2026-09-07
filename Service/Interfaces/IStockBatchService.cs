@@ -17,6 +17,12 @@ public interface IStockBatchService
     /// </summary>
     Task<StockBatchDto> UpdateAsync(long batchId, UpdateStockBatchDto request, string updatedBy, CancellationToken cancellationToken = default);
 
+    Task<StockBatchDto> UpdateSellingPriceAsync(
+        long batchId,
+        UpdateBatchSellingPriceDto request,
+        string updatedBy,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Deletes a batch. Only allowed while it is untouched (AvailableQty == ReceivedQty, no movements beyond the initial receipt).</summary>
     Task DeleteAsync(long batchId, CancellationToken cancellationToken = default);
 }

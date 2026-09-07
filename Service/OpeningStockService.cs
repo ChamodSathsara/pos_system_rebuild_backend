@@ -128,6 +128,7 @@ public class OpeningStockService : IOpeningStockService
             BatchNo = batchNo,
             ReceivedQty = request.Quantity,
             UnitCost = request.UnitCost,
+            SellingPrice = request.SellingPrice,
             ExpiryDate = request.ExpiryDate,
             ReceivedDate = openingDate,
             ReferenceType = StockReferenceType.OpeningStock,
