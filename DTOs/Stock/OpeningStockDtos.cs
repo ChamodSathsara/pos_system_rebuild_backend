@@ -8,9 +8,9 @@ public class CreateOpeningStockDto
     public string BranchCode { get; set; } = string.Empty;
     public string WarehouseCode { get; set; } = string.Empty;
 
-    public string BatchNo { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal SellingPrice { get; set; }
 
     public DateOnly? ExpiryDate { get; set; }
     public DateTime? OpeningDate { get; set; }
@@ -29,6 +29,8 @@ public class OpeningStockDto
     public decimal Quantity { get; set; }
 
     public decimal UnitCost { get; set; }
+
+    public decimal SellingPrice { get; set; }
 
     public decimal TotalValue { get; set; }
 

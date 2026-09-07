@@ -20,10 +20,6 @@ public class CreateOpeningStockValidator
             .NotEmpty()
             .MaximumLength(50);
 
-        RuleFor(x => x.BatchNo)
-            .NotEmpty()
-            .MaximumLength(50);
-
         RuleFor(x => x.Quantity)
             .GreaterThan(0)
             .WithMessage(
@@ -31,7 +27,11 @@ public class CreateOpeningStockValidator
 
         RuleFor(x => x.UnitCost)
             .GreaterThanOrEqualTo(0)
-            .WithMessage("Unit cost cannot be negative.");
+                .WithMessage("Unit cost cannot be negative.");
+
+        RuleFor(x => x.SellingPrice)
+            .GreaterThan(0)
+            .WithMessage("Selling price must be greater than zero.");
 
         RuleFor(x => x.ReferenceNo)
             .MaximumLength(50);

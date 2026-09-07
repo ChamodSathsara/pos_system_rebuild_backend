@@ -88,6 +88,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.HasSequence<int>("customer_code_sequence");
         modelBuilder.HasSequence<int>("branch_code_sequence");
         modelBuilder.HasSequence<int>("warehouse_code_sequence");
+        modelBuilder.HasSequence<int>("opening_stock_batch_sequence");
 
         // Applies every IEntityTypeConfiguration<T> found in Data/Configurations.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);

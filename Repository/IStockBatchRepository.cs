@@ -4,6 +4,8 @@ namespace PosApi.Repository;
 
 public interface IStockBatchRepository : IGenericRepository<StockBatch, long>
 {
+    Task<string> GenerateNextBatchNoAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<StockBatch>> GetByStockIdAsync(int stockId, CancellationToken cancellationToken = default);
 
     Task<bool> BatchNoExistsAsync(int stockId, string batchNo, CancellationToken cancellationToken = default);

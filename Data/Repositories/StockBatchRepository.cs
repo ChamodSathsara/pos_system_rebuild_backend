@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using PosApi.Models.Entities;
 using PosApi.Models.Enums;
@@ -9,6 +10,32 @@ public class StockBatchRepository : GenericRepository<StockBatch, long>, IStockB
 {
     public StockBatchRepository(ApplicationDbContext context) : base(context)
     {
+    }
+
+    public async Task<string> GenerateNextBatchNoAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = Context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+
+        try
+        {
+            if (shouldClose)
+            {
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT NEXT VALUE FOR dbo.opening_stock_batch_sequence";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return $"BAT{Convert.ToInt32(result):D6}";
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     public async Task<IReadOnlyList<StockBatch>> GetByStockIdAsync(int stockId, CancellationToken cancellationToken = default)

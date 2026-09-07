@@ -33,7 +33,7 @@ public class OpeningStockService : IOpeningStockService
         var itemCode = request.ItemCode.Trim();
         var branchCode = request.BranchCode.Trim();
         var warehouseCode = request.WarehouseCode.Trim();
-        var batchNo = request.BatchNo.Trim();
+        var batchNo = await _unitOfWork.StockBatches.GenerateNextBatchNoAsync(cancellationToken);
         var openingDate = request.OpeningDate ?? DateTime.UtcNow;
 
         ValidateBranchAccess(
@@ -41,11 +41,14 @@ public class OpeningStockService : IOpeningStockService
             userBranchCode,
             userRole);
 
-        await ValidateReferencesAsync(
+        var product = await ValidateReferencesAsync(
             itemCode,
             branchCode,
             warehouseCode,
             cancellationToken);
+
+        product.SellingPrice = request.SellingPrice;
+        product.UpdatedAt = DateTime.UtcNow;
 
         var stock = await _unitOfWork.StockInventories
             .GetByCombinationAsync(
@@ -159,6 +162,7 @@ public class OpeningStockService : IOpeningStockService
             BatchNo = batch.BatchNo,
             Quantity = batch.ReceivedQty,
             UnitCost = batch.UnitCost,
+            SellingPrice = request.SellingPrice,
             TotalValue = batch.ReceivedQty * batch.UnitCost,
             ExpiryDate = batch.ExpiryDate,
             OpeningDate = batch.ReceivedDate,
@@ -167,7 +171,7 @@ public class OpeningStockService : IOpeningStockService
         };
     }
 
-    private async Task ValidateReferencesAsync(
+    private async Task<ProductMaster> ValidateReferencesAsync(
         string itemCode,
         string branchCode,
         string warehouseCode,
@@ -216,6 +220,8 @@ public class OpeningStockService : IOpeningStockService
                 $"Warehouse '{warehouseCode}' does not belong " +
                 $"to branch '{branchCode}'.");
         }
+
+        return product;
     }
 
     private static void ValidateBranchAccess(
