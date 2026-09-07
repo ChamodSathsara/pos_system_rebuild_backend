@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PosApi.DTOs.Auth;
 
 public class LoginRequestDto
@@ -10,6 +12,7 @@ public class LoginResponseDto
 {
     public string AccessToken { get; set; } = string.Empty;
     public DateTime AccessTokenExpiresAt { get; set; }
+    [JsonIgnore]
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime RefreshTokenExpiresAt { get; set; }
     public CurrentUserDto User { get; set; } = null!;

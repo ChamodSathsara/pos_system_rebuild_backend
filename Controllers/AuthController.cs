@@ -14,6 +14,7 @@ namespace PosApi.Controllers;
 [Route("api/auth")]
 public class AuthController : BaseApiController
 {
+    private const string RefreshTokenCookieName = "pos_refresh_token";
     private readonly IAuthService _authService;
 
     public AuthController(IAuthService authService)
@@ -32,7 +33,28 @@ public class AuthController : BaseApiController
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         var result = await _authService.LoginAsync(request, cancellationToken);
+        SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
+        Response.Headers.CacheControl = "no-store";
         return Ok(ApiResponse<LoginResponseDto>.SuccessResponse(result, "Login successful."));
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        if (!Request.Headers.TryGetValue("X-Requested-With", out var requestedWith)
+            || requestedWith != "XMLHttpRequest")
+        {
+            return BadRequest(ApiResponse.FailResponse("Invalid refresh request."));
+        }
+
+        Request.Cookies.TryGetValue(RefreshTokenCookieName, out var refreshToken);
+        var result = await _authService.RefreshAsync(refreshToken ?? string.Empty, cancellationToken);
+        SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
+        Response.Headers.CacheControl = "no-store";
+        return Ok(ApiResponse<LoginResponseDto>.SuccessResponse(result, "Token refreshed successfully."));
     }
 
     /// <summary>
@@ -41,11 +63,13 @@ public class AuthController : BaseApiController
     /// refresh token for the user is revoked (logout from all devices).
     /// </summary>
     [HttpPost("logout")]
-    [Authorize]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Logout([FromBody] LogoutRequestDto? request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        await _authService.LogoutAsync(CurrentUserCode, request?.RefreshToken, cancellationToken);
+        Request.Cookies.TryGetValue(RefreshTokenCookieName, out var refreshToken);
+        await _authService.LogoutAsync(refreshToken, cancellationToken);
+        DeleteRefreshTokenCookie();
         return Ok(ApiResponse.SuccessResponse("Logout successful."));
     }
 
@@ -82,17 +106,28 @@ public class AuthController : BaseApiController
     }
 
 
-    [HttpGet("hashpassword")]
-    //[Authorize]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public String Test2()
+    private void SetRefreshTokenCookie(string refreshToken, DateTime expiresAt)
     {
-        var password = "00000000";
+        Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Expires = new DateTimeOffset(expiresAt),
+            Path = "/api/auth",
+            IsEssential = true
+        });
+    }
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
-
-        Console.WriteLine(passwordHash);
-        return passwordHash;
+    private void DeleteRefreshTokenCookie()
+    {
+        Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = "/api/auth"
+        });
     }
 
     

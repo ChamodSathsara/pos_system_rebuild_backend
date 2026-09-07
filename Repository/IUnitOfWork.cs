@@ -1,3 +1,6 @@
+using System.Data;
+using Microsoft.EntityFrameworkCore.Storage;
+
 namespace PosApi.Repository;
 
 /// <summary>
@@ -6,6 +9,9 @@ namespace PosApi.Repository;
 /// </summary>
 public interface IUnitOfWork
 {
+    Task<IDbContextTransaction> BeginTransactionAsync(
+        IsolationLevel isolationLevel,
+        CancellationToken cancellationToken = default);
     IUserRepository Users { get; }
     ICustomerRepository Customers { get; }
     IRefreshTokenRepository RefreshTokens { get; }

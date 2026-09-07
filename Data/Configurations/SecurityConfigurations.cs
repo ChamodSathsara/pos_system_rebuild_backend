@@ -101,12 +101,15 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
         builder.Property(x => x.UserCode).HasColumnName("user_code").HasMaxLength(50).IsRequired();
-        builder.Property(x => x.Token).HasColumnName("token").HasMaxLength(255).IsRequired();
+        builder.Property(x => x.TokenHash).HasColumnName("token_hash").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.FamilyId).HasColumnName("family_id").HasMaxLength(36).IsRequired();
+        builder.Property(x => x.ReplacedByTokenHash).HasColumnName("replaced_by_token_hash").HasMaxLength(64);
         builder.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.RevokedAt).HasColumnName("revoked_at");
 
-        builder.HasIndex(x => x.Token).IsUnique();
+        builder.HasIndex(x => x.TokenHash).IsUnique();
+        builder.HasIndex(x => new { x.UserCode, x.FamilyId });
 
         builder.HasOne(x => x.User)
             .WithMany(x => x.RefreshTokens)
