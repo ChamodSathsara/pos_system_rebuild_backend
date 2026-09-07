@@ -3,6 +3,9 @@ using PosApi.Extensions;
 using PosApi.Middleware;
 using Serilog;
 using Microsoft.OpenApi;
+using PosApi.Configuration;
+using PosApi.Service;
+using PosApi.Service.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +45,9 @@ builder.Services.AddApplicationServices();
 builder.Services.AddValidatorsAndFluentValidation();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddSwaggerWithJwt();
+builder.Services.Configure<QzSigningSettings>(
+    builder.Configuration.GetSection(QzSigningSettings.SectionName));
+builder.Services.AddScoped<IQzSigningService, QzSigningService>();
 
 builder.Services.AddCors(options =>
 {
@@ -62,6 +68,23 @@ builder.Services.AddCors(options =>
             throw new InvalidOperationException(
                 "Cors:AllowedOrigins must contain at least one trusted frontend origin.");
         }
+    });
+
+    options.AddPolicy("QzCorsPolicy", policy =>
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? Array.Empty<string>();
+
+        if (allowedOrigins.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "Cors:AllowedOrigins must contain at least one trusted frontend origin.");
+        }
+
+        policy.WithOrigins(allowedOrigins)
+            .WithHeaders("Authorization", "Content-Type", "Cache-Control")
+            .WithMethods("GET", "POST", "OPTIONS")
+            .AllowCredentials();
     });
 });
 
