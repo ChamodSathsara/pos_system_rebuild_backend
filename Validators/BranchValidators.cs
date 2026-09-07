@@ -8,8 +8,8 @@ public class CreateBranchValidator : AbstractValidator<CreateBranchDto>
     public CreateBranchValidator()
     {
         RuleFor(x => x.BranchCode)
-            .NotEmpty().WithMessage("Branch code is required.")
-            .MaximumLength(50);
+            .MaximumLength(50)
+            .When(x => !string.IsNullOrWhiteSpace(x.BranchCode));
 
         RuleFor(x => x.BranchName)
             .NotEmpty().WithMessage("Branch name is required.")

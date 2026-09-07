@@ -39,11 +39,21 @@ public class BranchService : IBranchService
 
     public async Task<BranchDto> CreateAsync(CreateBranchDto request, CancellationToken cancellationToken = default)
     {
-        var branchCode = request.BranchCode.Trim();
+        var branchCode = request.BranchCode?.Trim();
+        var branchName = request.BranchName.Trim();
 
-        if (await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
+        if (string.IsNullOrWhiteSpace(branchCode))
+        {
+            branchCode = await _unitOfWork.Branches.GenerateNextBranchCodeAsync(cancellationToken);
+        }
+        else if (await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
         {
             throw new ConflictException($"A branch with code '{branchCode}' already exists.");
+        }
+
+        if (await _unitOfWork.Branches.BranchNameExistsAsync(branchName, cancellationToken: cancellationToken))
+        {
+            throw new ConflictException($"A branch with name '{branchName}' already exists.");
         }
 
         if (!string.IsNullOrWhiteSpace(request.CompanyCode)
@@ -55,7 +65,7 @@ public class BranchService : IBranchService
         var branch = new Branch
         {
             BranchCode = branchCode,
-            BranchName = request.BranchName.Trim(),
+            BranchName = branchName,
             Address = request.Address,
             Phone = request.Phone,
             Status = request.Status,
@@ -76,13 +86,20 @@ public class BranchService : IBranchService
         var branch = await _unitOfWork.Branches.GetByIdAsync(branchCode, cancellationToken)
             ?? throw new NotFoundException("Branch", branchCode);
 
+        var branchName = request.BranchName.Trim();
+        if (await _unitOfWork.Branches.BranchNameExistsAsync(
+                branchName, branch.BranchCode, cancellationToken))
+        {
+            throw new ConflictException($"A branch with name '{branchName}' already exists.");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.CompanyCode)
             && !await _unitOfWork.Companies.CompanyCodeExistsAsync(request.CompanyCode, cancellationToken))
         {
             throw new BadRequestException($"Company '{request.CompanyCode}' does not exist.");
         }
 
-        branch.BranchName = request.BranchName.Trim();
+        branch.BranchName = branchName;
         branch.Address = request.Address;
         branch.Phone = request.Phone;
         branch.Status = request.Status;

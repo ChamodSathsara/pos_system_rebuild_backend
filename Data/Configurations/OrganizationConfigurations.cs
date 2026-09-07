@@ -37,6 +37,8 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
+        builder.HasIndex(x => x.BranchName).IsUnique();
+
         builder.HasOne(x => x.Company)
             .WithMany(x => x.Branches)
             .HasForeignKey(x => x.CompanyCode)

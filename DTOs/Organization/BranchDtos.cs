@@ -4,7 +4,8 @@ namespace PosApi.DTOs.Organization;
 
 public class CreateBranchDto
 {
-    public string BranchCode { get; set; } = string.Empty;
+    /// <summary>Optional. Auto-generated (for example BRA00001) when omitted.</summary>
+    public string? BranchCode { get; set; }
     public string BranchName { get; set; } = string.Empty;
     public string? Address { get; set; }
     public string? Phone { get; set; }
