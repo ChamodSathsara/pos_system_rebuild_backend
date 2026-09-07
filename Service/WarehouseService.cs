@@ -39,17 +39,26 @@ public class WarehouseService : IWarehouseService
 
     public async Task<WarehouseDto> CreateAsync(CreateWarehouseDto request, CancellationToken cancellationToken = default)
     {
-        var warehouseCode = request.WarehouseCode.Trim();
+        var warehouseCode = request.WarehouseCode?.Trim();
+        var branchCode = request.BranchCode?.Trim();
 
-        if (await _unitOfWork.Warehouses.WarehouseCodeExistsAsync(warehouseCode, cancellationToken))
+        if (string.IsNullOrWhiteSpace(branchCode))
+        {
+            throw new BadRequestException("Branch is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(warehouseCode))
+        {
+            warehouseCode = await _unitOfWork.Warehouses.GenerateNextWarehouseCodeAsync(cancellationToken);
+        }
+        else if (await _unitOfWork.Warehouses.WarehouseCodeExistsAsync(warehouseCode, cancellationToken))
         {
             throw new ConflictException($"A warehouse with code '{warehouseCode}' already exists.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.BranchCode)
-            && !await _unitOfWork.Branches.BranchCodeExistsAsync(request.BranchCode, cancellationToken))
+        if (!await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
         {
-            throw new BadRequestException($"Branch '{request.BranchCode}' does not exist.");
+            throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
         var warehouse = new Warehouse
@@ -57,7 +66,7 @@ public class WarehouseService : IWarehouseService
             WarehouseCode = warehouseCode,
             WarehouseName = request.WarehouseName.Trim(),
             Address = request.Address,
-            BranchCode = request.BranchCode,
+            BranchCode = branchCode,
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow
         };
@@ -75,15 +84,20 @@ public class WarehouseService : IWarehouseService
         var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(warehouseCode, cancellationToken)
             ?? throw new NotFoundException("Warehouse", warehouseCode);
 
-        if (!string.IsNullOrWhiteSpace(request.BranchCode)
-            && !await _unitOfWork.Branches.BranchCodeExistsAsync(request.BranchCode, cancellationToken))
+        var branchCode = request.BranchCode?.Trim();
+        if (string.IsNullOrWhiteSpace(branchCode))
         {
-            throw new BadRequestException($"Branch '{request.BranchCode}' does not exist.");
+            throw new BadRequestException("Branch is required.");
+        }
+
+        if (!await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
+        {
+            throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
         warehouse.WarehouseName = request.WarehouseName.Trim();
         warehouse.Address = request.Address;
-        warehouse.BranchCode = request.BranchCode;
+        warehouse.BranchCode = branchCode;
         warehouse.IsActive = request.IsActive;
 
         _unitOfWork.Warehouses.Update(warehouse);

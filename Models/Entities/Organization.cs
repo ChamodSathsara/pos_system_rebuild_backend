@@ -38,7 +38,7 @@ public class Warehouse
     public string WarehouseCode { get; set; } = null!;
     public string WarehouseName { get; set; } = null!;
     public string? Address { get; set; }
-    public string? BranchCode { get; set; }
+    public string BranchCode { get; set; } = null!;
     public bool IsActive { get; set; }
     public DateTime? CreatedAt { get; set; }
 
