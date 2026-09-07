@@ -59,7 +59,8 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin();
+            throw new InvalidOperationException(
+                "Cors:AllowedOrigins must contain at least one trusted frontend origin.");
         }
     });
 });
