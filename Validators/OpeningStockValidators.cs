@@ -13,8 +13,8 @@ public class CreateOpeningStockValidator
             .MaximumLength(50);
 
         RuleFor(x => x.BranchCode)
-            .NotEmpty()
-            .MaximumLength(50);
+            .MaximumLength(50)
+            .When(x => !string.IsNullOrWhiteSpace(x.BranchCode));
 
         RuleFor(x => x.WarehouseCode)
             .NotEmpty()

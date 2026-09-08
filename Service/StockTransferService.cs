@@ -65,7 +65,6 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
     public async Task<StockTransferDispatchDto> DispatchAsync(long id, CreateStockTransferDispatchDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
     {
         if (request.Lines.Count == 0 || request.Lines.Any(x => x.Quantity <= 0)) throw new BadRequestException("At least one batch and dispatch quantity are required.");
-        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         var transfer = await RequestAsync(id, ct);
         EnsureWarehouseAccess(transfer.SourceWarehouseCode, userWarehouseCode, role);
         if (transfer.Status is not StockTransferStatus.Accepted and not StockTransferStatus.Picking) throw new ConflictException("Only accepted requests can be dispatched.");
@@ -89,7 +88,9 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
             context.ItemLogs.Add(ItemLogFactory.Create(stock.ItemCode, ItemLogActions.StockChanged, previous.ToString(), stock.CurrentQty.ToString(), userCode));
         }
         transfer.Status = StockTransferStatus.Dispatched; transfer.UpdatedAt = now;
-        await context.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        // SaveChanges creates its own transaction. Do not start a user transaction here because
+        // SQL Server retry execution strategy rejects it outside ExecuteAsync.
+        await context.SaveChangesAsync(ct);
         logger.LogInformation("Transfer {RequestNo} dispatched as {DispatchNo} by {UserCode}", transfer.RequestNo, dispatch.DispatchNo, userCode);
         return ToDto(dispatch);
     }
@@ -133,7 +134,6 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
 
     public async Task<StockTransferReceiptDto> ReceiveAsync(long dispatchId, ReceiveStockTransferDispatchDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         var dispatch = await context.StockTransferDispatches.Include(x => x.TransferRequest).ThenInclude(x => x!.Lines).Include(x => x.Lines).ThenInclude(x => x.StockBatch).ThenInclude(x => x!.StockInventory).SingleOrDefaultAsync(x => x.DispatchId == dispatchId, ct) ?? throw new NotFoundException("StockTransferDispatch", dispatchId);
         if (dispatch.Receipt is not null || await context.StockTransferReceipts.AnyAsync(x => x.DispatchId == dispatchId, ct)) throw new ConflictException("This dispatch has already been received.");
         var transfer = dispatch.TransferRequest!;
@@ -161,7 +161,8 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
             receipt.Lines.Add(new StockTransferReceiptLine { DispatchLineId = dispatchLine.DispatchLineId, ReceivedQty = dto.ReceivedQty, DamagedQty = dto.DamagedQty, ShortQty = dto.ShortQty, Remarks = Clean(dto.Remarks) });
         }
         transfer.Status = StockTransferStatus.Received; transfer.UpdatedAt = now;
-        await context.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        // SaveChanges creates its own transaction; compatible with the configured retry strategy.
+        await context.SaveChangesAsync(ct);
         return new StockTransferReceiptDto { ReceiptId = receipt.ReceiptId, ReceiptNo = receipt.ReceiptNo, DispatchId = dispatchId, ReceivedAt = receipt.ReceivedAt };
     }
 
