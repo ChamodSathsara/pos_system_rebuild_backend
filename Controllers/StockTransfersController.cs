@@ -30,13 +30,20 @@ public class StockTransfersController(IStockTransferService service) : BaseApiCo
     [Authorize(Roles = "Admin,Manager,InventoryClerk")]
     public async Task<IActionResult> Dispatch(long id, [FromBody] CreateStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(await service.DispatchAsync(id, request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct), "Stock dispatched. Delivery note is ready."));
 
-    /// <summary>Central InventoryClerk dispatches stock to a branch without a branch request/PO.</summary>
-    [HttpPost("direct-dispatches")]
+    /// <summary>Central InventoryClerk proposes a transfer. This does not reduce central stock.</summary>
+    [HttpPost("direct")]
     [Authorize(Roles = "Admin,Manager,InventoryClerk")]
-    public async Task<IActionResult> DirectDispatch([FromBody] CreateDirectStockTransferDto request, CancellationToken ct) =>
-        StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(
-            await service.DirectDispatchAsync(request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct),
-            "Direct stock transfer dispatched. Delivery note is ready."));
+    public async Task<IActionResult> CreateDirect([FromBody] CreateDirectTransferProposalDto request, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferRequestDto>.SuccessResponse(
+            await service.CreateDirectProposalAsync(request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct),
+            "Transfer proposal sent to the destination branch for acceptance."));
+
+    /// <summary>Destination branch accepts a central warehouse transfer proposal, placing it in the central dispatch queue.</summary>
+    [HttpPost("{id:long}/branch-accept")]
+    public async Task<IActionResult> BranchAccept(long id, [FromBody] BranchTransferDecisionDto request, CancellationToken ct) =>
+        Ok(ApiResponse<StockTransferRequestDto>.SuccessResponse(
+            await service.BranchAcceptAsync(id, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct),
+            "Transfer accepted. It is now in the main warehouse dispatch queue."));
 
     [HttpPost("dispatches/{dispatchId:long}/receive")]
     public async Task<IActionResult> Receive(long dispatchId, [FromBody] ReceiveStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferReceiptDto>.SuccessResponse(await service.ReceiveAsync(dispatchId, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct), "Delivery received and branch stock updated."));

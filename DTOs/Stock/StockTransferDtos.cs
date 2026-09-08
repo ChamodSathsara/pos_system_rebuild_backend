@@ -18,6 +18,9 @@ public class CreateStockTransferDispatchLineDto { public long TransferRequestLin
 /// <summary>InventoryClerk dispatches central stock directly to a branch without a branch request/PO.</summary>
 public class CreateDirectStockTransferDto { public string DestinationWarehouseCode { get; set; } = string.Empty; public string? VehicleNo { get; set; } public string? DriverName { get; set; } public string? Remarks { get; set; } public List<CreateDirectStockTransferLineDto> Lines { get; set; } = []; }
 public class CreateDirectStockTransferLineDto { public string ItemCode { get; set; } = string.Empty; public long BatchId { get; set; } public decimal Quantity { get; set; } public string? Remarks { get; set; } }
+/// <summary>Central warehouse proposal. No stock or batch is reserved until the central dispatch step.</summary>
+public class CreateDirectTransferProposalDto { public string DestinationWarehouseCode { get; set; } = string.Empty; public string? Remarks { get; set; } public List<CreateStockTransferRequestLineDto> Lines { get; set; } = []; }
+public class BranchTransferDecisionDto { public string? Remarks { get; set; } }
 public class ReceiveStockTransferDispatchDto { public string? Remarks { get; set; } public List<ReceiveStockTransferLineDto> Lines { get; set; } = []; }
 public class ReceiveStockTransferLineDto { public long DispatchLineId { get; set; } public decimal ReceivedQty { get; set; } public decimal DamagedQty { get; set; } public decimal ShortQty { get; set; } public string? Remarks { get; set; } }
 

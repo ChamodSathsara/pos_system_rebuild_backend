@@ -77,6 +77,7 @@ public enum StockTransferStatus
 {
     Draft,
     Submitted,
+    AwaitingBranch,
     Accepted,
     Picking,
     Dispatched,

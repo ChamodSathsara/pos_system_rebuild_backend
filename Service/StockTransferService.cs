@@ -132,6 +132,49 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         }, userCode, userWarehouseCode, role, ct);
     }
 
+    public async Task<StockTransferRequestDto> CreateDirectProposalAsync(CreateDirectTransferProposalDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userWarehouseCode)) throw new ForbiddenAppException("Your user account is not assigned to a main warehouse.");
+        if (request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.ItemCode) || x.Quantity <= 0)) throw new BadRequestException("At least one item and quantity greater than zero is required.");
+        var source = await WarehouseAsync(userWarehouseCode, ct);
+        EnsureWarehouseAccess(source.WarehouseCode, userWarehouseCode, role);
+        if (!source.IsCentralWarehouse) throw new BadRequestException("Direct transfers can only be created from a central warehouse.");
+        var destination = await WarehouseAsync(request.DestinationWarehouseCode, ct);
+        if (destination.IsCentralWarehouse || string.IsNullOrWhiteSpace(destination.BranchCode)) throw new BadRequestException("The destination must be a branch warehouse.");
+        if (source.WarehouseCode == destination.WarehouseCode) throw new BadRequestException("Source and destination warehouses must be different.");
+        var codes = request.Lines.Select(x => x.ItemCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (codes.Count != request.Lines.Count || await context.Products.CountAsync(x => codes.Contains(x.ItemCode), ct) != codes.Count) throw new BadRequestException("Every requested item must exist and be included only once.");
+
+        var now = DateTime.UtcNow;
+        var transfer = new StockTransferRequest
+        {
+            RequestNo = $"DIR{now:yyyyMMddHHmmssfff}", SourceWarehouseCode = source.WarehouseCode, DestinationWarehouseCode = destination.WarehouseCode,
+            RequestDate = now, Status = StockTransferStatus.AwaitingBranch, Remarks = Clean(request.Remarks), RequestedBy = userCode, CreatedAt = now,
+            Lines = request.Lines.Select(x => new StockTransferRequestLine { ItemCode = x.ItemCode.Trim(), RequestedQty = x.Quantity, Remarks = Clean(x.Remarks) }).ToList()
+        };
+        context.StockTransferRequests.Add(transfer);
+        await context.SaveChangesAsync(ct);
+        logger.LogInformation("Direct transfer proposal {RequestNo} created by {UserCode} for branch warehouse {Destination}", transfer.RequestNo, userCode, destination.WarehouseCode);
+        return ToDto(transfer);
+    }
+
+    public async Task<StockTransferRequestDto> BranchAcceptAsync(long id, BranchTransferDecisionDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default)
+    {
+        var transfer = await RequestAsync(id, ct);
+        if (transfer.Status != StockTransferStatus.AwaitingBranch) throw new ConflictException("Only transfers awaiting branch acceptance can be accepted by a branch.");
+        var destination = await WarehouseAsync(transfer.DestinationWarehouseCode, ct);
+        if (!IsGlobalRole(role) && !string.Equals(destination.BranchCode, userBranchCode, StringComparison.OrdinalIgnoreCase)) throw new ForbiddenAppException("You can only accept transfers for your assigned branch.");
+        foreach (var line in transfer.Lines) line.ApprovedQty = line.RequestedQty;
+        transfer.Status = StockTransferStatus.Accepted;
+        transfer.AcceptedBy = userCode;
+        transfer.AcceptedAt = DateTime.UtcNow;
+        transfer.UpdatedAt = DateTime.UtcNow;
+        transfer.Remarks = Clean(request.Remarks) ?? transfer.Remarks;
+        await context.SaveChangesAsync(ct);
+        logger.LogInformation("Direct transfer proposal {RequestNo} accepted by branch user {UserCode}", transfer.RequestNo, userCode);
+        return ToDto(transfer);
+    }
+
     public async Task<StockTransferReceiptDto> ReceiveAsync(long dispatchId, ReceiveStockTransferDispatchDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default)
     {
         var dispatch = await context.StockTransferDispatches.Include(x => x.TransferRequest).ThenInclude(x => x!.Lines).Include(x => x.Lines).ThenInclude(x => x.StockBatch).ThenInclude(x => x!.StockInventory).SingleOrDefaultAsync(x => x.DispatchId == dispatchId, ct) ?? throw new NotFoundException("StockTransferDispatch", dispatchId);
