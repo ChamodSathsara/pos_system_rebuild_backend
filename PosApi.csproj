@@ -52,6 +52,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Never treat local verification build output as web content. -->
+    <Content Remove="build-verify*/**" />
+    <None Remove="build-verify*/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="App_Data\Qz\digital-certificate.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="App_Data\Qz\private-key.pem" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
