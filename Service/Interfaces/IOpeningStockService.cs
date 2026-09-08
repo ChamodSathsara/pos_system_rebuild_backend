@@ -8,6 +8,7 @@ public interface IOpeningStockService
         CreateOpeningStockDto request,
         string createdBy,
         string? userBranchCode,
+        string? userWarehouseCode,
         string? userRole,
         CancellationToken cancellationToken = default);
 }

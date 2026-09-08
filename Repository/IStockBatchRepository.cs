@@ -21,6 +21,9 @@ public interface IStockBatchRepository : IGenericRepository<StockBatch, long>
     /// </summary>
     Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemAndBranchAsync(string itemCode, string branchCode, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked, FIFO batches for one item in one exact warehouse. Supports central warehouses with no branch.</summary>
+    Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemAndWarehouseAsync(string itemCode, string warehouseCode, CancellationToken cancellationToken = default);
+
     /// <summary>Loads tracked FIFO batches for every requested item in one database query.</summary>
     Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemsAndBranchAsync(
         IReadOnlyCollection<string> itemCodes,

@@ -30,6 +30,14 @@ public class StockTransfersController(IStockTransferService service) : BaseApiCo
     [Authorize(Roles = "Admin,Manager,InventoryClerk")]
     public async Task<IActionResult> Dispatch(long id, [FromBody] CreateStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(await service.DispatchAsync(id, request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct), "Stock dispatched. Delivery note is ready."));
 
+    /// <summary>Central InventoryClerk dispatches stock to a branch without a branch request/PO.</summary>
+    [HttpPost("direct-dispatches")]
+    [Authorize(Roles = "Admin,Manager,InventoryClerk")]
+    public async Task<IActionResult> DirectDispatch([FromBody] CreateDirectStockTransferDto request, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(
+            await service.DirectDispatchAsync(request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct),
+            "Direct stock transfer dispatched. Delivery note is ready."));
+
     [HttpPost("dispatches/{dispatchId:long}/receive")]
     public async Task<IActionResult> Receive(long dispatchId, [FromBody] ReceiveStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferReceiptDto>.SuccessResponse(await service.ReceiveAsync(dispatchId, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct), "Delivery received and branch stock updated."));
 

@@ -45,7 +45,7 @@ public class DamageItemService : IDamageItemService
         return _mapper.Map<DamageItemDto>(damageItem);
     }
 
-    public async Task<DamageItemDto> CreateAsync(CreateDamageItemDto request, string reportedBy, CancellationToken cancellationToken = default)
+    public async Task<DamageItemDto> CreateAsync(CreateDamageItemDto request, string reportedBy, string? currentWarehouseCode, string? currentRole, CancellationToken cancellationToken = default)
     {
         if (request.Quantity <= 0)
         {
@@ -55,28 +55,34 @@ public class DamageItemService : IDamageItemService
         var product = await _unitOfWork.Products.GetByIdAsync(request.ItemCode, cancellationToken)
             ?? throw new NotFoundException("Product", request.ItemCode);
 
-        var branch = await _unitOfWork.Branches.GetByIdAsync(request.BranchCode, cancellationToken)
-            ?? throw new NotFoundException("Branch", request.BranchCode);
-
-        if (!string.IsNullOrWhiteSpace(request.WarehouseCode))
+        if (string.IsNullOrWhiteSpace(request.WarehouseCode)) throw new BadRequestException("Warehouse code is required for a damage report.");
+        var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(request.WarehouseCode, cancellationToken)
+            ?? throw new NotFoundException("Warehouse", request.WarehouseCode);
+        Branch? branch = null;
+        if (warehouse.IsCentralWarehouse)
         {
-            _ = await _unitOfWork.Warehouses.GetByIdAsync(request.WarehouseCode, cancellationToken)
-                ?? throw new NotFoundException("Warehouse", request.WarehouseCode);
+            if (!string.IsNullOrWhiteSpace(request.BranchCode)) throw new BadRequestException("Central warehouse damage reports must not include a branch code.");
+            var isGlobal = string.Equals(currentRole, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(currentRole, "Manager", StringComparison.OrdinalIgnoreCase);
+            if (!isGlobal && (!string.Equals(currentRole, "InventoryClerk", StringComparison.OrdinalIgnoreCase) || !string.Equals(currentWarehouseCode, warehouse.WarehouseCode, StringComparison.OrdinalIgnoreCase)))
+                throw new ForbiddenAppException("Only the InventoryClerk assigned to this central warehouse can record its damage.");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.BranchCode)) throw new BadRequestException("Branch code is required for a branch warehouse damage report.");
+            branch = await _unitOfWork.Branches.GetByIdAsync(request.BranchCode, cancellationToken) ?? throw new NotFoundException("Branch", request.BranchCode);
+            if (!string.Equals(warehouse.BranchCode, branch.BranchCode, StringComparison.OrdinalIgnoreCase)) throw new BadRequestException("The selected branch does not own the selected warehouse.");
         }
 
         // ---- There is no approval workflow: locate the stock to draw down from up front (FIFO
         // across batches, same approach used to post a sale) so we fail fast if there isn't
         // enough on hand, before anything is written. ----
-        var batches = (await _unitOfWork.StockBatches.GetAvailableBatchesByItemAndBranchAsync(product.ItemCode, branch.BranchCode, cancellationToken))
-            .Where(b => string.IsNullOrWhiteSpace(request.WarehouseCode)
-                || (b.StockInventory != null && b.StockInventory.WarehouseCode == request.WarehouseCode))
-            .ToList();
+        var batches = (await _unitOfWork.StockBatches.GetAvailableBatchesByItemAndWarehouseAsync(product.ItemCode, warehouse.WarehouseCode, cancellationToken)).ToList();
 
         var availableQty = batches.Sum(b => b.AvailableQty);
         if (availableQty < request.Quantity)
         {
             throw new BadRequestException(
-                $"Insufficient stock for item '{product.ItemCode}' at branch '{branch.BranchCode}': requested {request.Quantity}, only {availableQty} available.");
+                $"Insufficient stock for item '{product.ItemCode}' at warehouse '{warehouse.WarehouseCode}': requested {request.Quantity}, only {availableQty} available.");
         }
 
         var remainingForCost = request.Quantity;
@@ -99,8 +105,8 @@ public class DamageItemService : IDamageItemService
         var damageItem = new DamageItem
         {
             ItemCode = product.ItemCode,
-            BranchCode = branch.BranchCode,
-            WarehouseCode = request.WarehouseCode,
+            BranchCode = warehouse.IsCentralWarehouse ? null : branch!.BranchCode,
+            WarehouseCode = warehouse.WarehouseCode,
             Quantity = request.Quantity,
             CostAmount = damageCost,
             Reason = request.Reason,
@@ -186,13 +192,14 @@ public class DamageItemService : IDamageItemService
                 reportedBy),
             cancellationToken);
 
-        await CreateDamageExpenseAsync(damageItem, reportedBy, cancellationToken);
+        // Central warehouse write-offs are inventory-only. They must never create Expenses.
+        if (!warehouse.IsCentralWarehouse) await CreateDamageExpenseAsync(damageItem, reportedBy, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "Damage report {DamageId} posted for item {ItemCode} at branch {BranchCode}: {Quantity} unit(s) written off by {ReportedBy}",
-            damageItem.DamageId, product.ItemCode, branch.BranchCode, request.Quantity, reportedBy);
+            damageItem.DamageId, product.ItemCode, warehouse.WarehouseCode, request.Quantity, reportedBy);
 
         return await GetByIdAsync(damageItem.DamageId, cancellationToken);
     }
@@ -210,18 +217,24 @@ public class DamageItemService : IDamageItemService
         var product = await _unitOfWork.Products.GetByIdAsync(request.ItemCode, cancellationToken)
             ?? throw new NotFoundException("Product", request.ItemCode);
 
-        var branch = await _unitOfWork.Branches.GetByIdAsync(request.BranchCode, cancellationToken)
-            ?? throw new NotFoundException("Branch", request.BranchCode);
-
-        if (!string.IsNullOrWhiteSpace(request.WarehouseCode))
+        if (string.IsNullOrWhiteSpace(request.WarehouseCode)) throw new BadRequestException("Warehouse code is required for a damage report.");
+        var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(request.WarehouseCode, cancellationToken)
+            ?? throw new NotFoundException("Warehouse", request.WarehouseCode);
+        Branch? branch = null;
+        if (warehouse.IsCentralWarehouse)
         {
-            _ = await _unitOfWork.Warehouses.GetByIdAsync(request.WarehouseCode, cancellationToken)
-                ?? throw new NotFoundException("Warehouse", request.WarehouseCode);
+            if (!string.IsNullOrWhiteSpace(request.BranchCode)) throw new BadRequestException("Central warehouse damage reports must not include a branch code.");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.BranchCode)) throw new BadRequestException("Branch code is required for a branch warehouse damage report.");
+            branch = await _unitOfWork.Branches.GetByIdAsync(request.BranchCode, cancellationToken) ?? throw new NotFoundException("Branch", request.BranchCode);
+            if (!string.Equals(warehouse.BranchCode, branch.BranchCode, StringComparison.OrdinalIgnoreCase)) throw new BadRequestException("The selected branch does not own the selected warehouse.");
         }
 
         damageItem.ItemCode = product.ItemCode;
-        damageItem.BranchCode = branch.BranchCode;
-        damageItem.WarehouseCode = request.WarehouseCode;
+        damageItem.BranchCode = warehouse.IsCentralWarehouse ? null : branch!.BranchCode;
+        damageItem.WarehouseCode = warehouse.WarehouseCode;
         damageItem.Quantity = request.Quantity;
         damageItem.CostAmount = request.CostAmount;
         damageItem.Reason = request.Reason;
@@ -229,7 +242,12 @@ public class DamageItemService : IDamageItemService
         damageItem.Status = request.Status;
 
         _unitOfWork.DamageItems.Update(damageItem);
-        await SyncDamageExpenseAsync(damageItem, cancellationToken);
+        if (!warehouse.IsCentralWarehouse) await SyncDamageExpenseAsync(damageItem, cancellationToken);
+        else
+        {
+            var existingExpense = (await _unitOfWork.Expenses.FindAsync(x => x.DamageId == damageItem.DamageId, cancellationToken)).SingleOrDefault();
+            if (existingExpense is not null) _unitOfWork.Expenses.Remove(existingExpense);
+        }
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Damage report {DamageId} updated to status {Status}", damageId, request.Status);

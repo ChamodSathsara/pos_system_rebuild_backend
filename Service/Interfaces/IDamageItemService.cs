@@ -17,7 +17,7 @@ public interface IDamageItemService
     Task<DamageItemDto> GetByIdAsync(int damageId, CancellationToken cancellationToken = default);
 
     /// <summary>Records a new damage report. ReportedBy is always set to the currently authenticated user.</summary>
-    Task<DamageItemDto> CreateAsync(CreateDamageItemDto request, string reportedBy, CancellationToken cancellationToken = default);
+    Task<DamageItemDto> CreateAsync(CreateDamageItemDto request, string reportedBy, string? currentWarehouseCode, string? currentRole, CancellationToken cancellationToken = default);
 
     Task<DamageItemDto> UpdateAsync(int damageId, UpdateDamageItemDto request, CancellationToken cancellationToken = default);
 

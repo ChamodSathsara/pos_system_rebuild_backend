@@ -94,6 +94,43 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         return ToDto(dispatch);
     }
 
+    public async Task<StockTransferDispatchDto> DirectDispatchAsync(CreateDirectStockTransferDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userWarehouseCode)) throw new ForbiddenAppException("Your user account is not assigned to a main warehouse.");
+        if (request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.ItemCode) || x.BatchId <= 0 || x.Quantity <= 0))
+            throw new BadRequestException("At least one item, batch and quantity greater than zero is required.");
+
+        var source = await WarehouseAsync(userWarehouseCode, ct);
+        EnsureWarehouseAccess(source.WarehouseCode, userWarehouseCode, role);
+        if (!source.IsCentralWarehouse) throw new BadRequestException("Direct transfers can only be dispatched from a central warehouse.");
+        var destination = await WarehouseAsync(request.DestinationWarehouseCode, ct);
+        if (destination.IsCentralWarehouse || string.IsNullOrWhiteSpace(destination.BranchCode)) throw new BadRequestException("The destination must be a branch warehouse.");
+        if (source.WarehouseCode == destination.WarehouseCode) throw new BadRequestException("Source and destination warehouses must be different.");
+        if (request.Lines.Select(x => x.ItemCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.Lines.Count)
+            throw new BadRequestException("An item can only appear once in a direct transfer.");
+
+        var now = DateTime.UtcNow;
+        var transfer = new StockTransferRequest
+        {
+            RequestNo = $"DIR{now:yyyyMMddHHmmssfff}", SourceWarehouseCode = source.WarehouseCode, DestinationWarehouseCode = destination.WarehouseCode,
+            RequestDate = now, Status = StockTransferStatus.Accepted, Remarks = Clean(request.Remarks), RequestedBy = userCode,
+            AcceptedBy = userCode, AcceptedAt = now, CreatedAt = now,
+            Lines = request.Lines.Select(x => new StockTransferRequestLine { ItemCode = x.ItemCode.Trim(), RequestedQty = x.Quantity, ApprovedQty = x.Quantity, Remarks = Clean(x.Remarks) }).ToList()
+        };
+        context.StockTransferRequests.Add(transfer);
+        await context.SaveChangesAsync(ct);
+
+        return await DispatchAsync(transfer.TransferRequestId, new CreateStockTransferDispatchDto
+        {
+            VehicleNo = request.VehicleNo, DriverName = request.DriverName, Remarks = request.Remarks,
+            Lines = request.Lines.Select(x => new CreateStockTransferDispatchLineDto
+            {
+                TransferRequestLineId = transfer.Lines.Single(line => line.ItemCode == x.ItemCode.Trim()).TransferRequestLineId,
+                BatchId = x.BatchId, Quantity = x.Quantity
+            }).ToList()
+        }, userCode, userWarehouseCode, role, ct);
+    }
+
     public async Task<StockTransferReceiptDto> ReceiveAsync(long dispatchId, ReceiveStockTransferDispatchDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(ct);

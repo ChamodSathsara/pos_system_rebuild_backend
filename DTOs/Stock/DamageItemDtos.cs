@@ -10,7 +10,7 @@ namespace PosApi.DTOs.Stock;
 public class CreateDamageItemDto
 {
     public string ItemCode { get; set; } = string.Empty;
-    public string BranchCode { get; set; } = string.Empty;
+    public string? BranchCode { get; set; }
     public string? WarehouseCode { get; set; }
     public decimal Quantity { get; set; }
     public decimal? CostAmount { get; set; }
@@ -26,7 +26,7 @@ public class CreateDamageItemDto
 public class UpdateDamageItemDto
 {
     public string ItemCode { get; set; } = string.Empty;
-    public string BranchCode { get; set; } = string.Empty;
+    public string? BranchCode { get; set; }
     public string? WarehouseCode { get; set; }
     public decimal Quantity { get; set; }
     public decimal? CostAmount { get; set; }

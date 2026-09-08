@@ -78,6 +78,14 @@ public class StockBatchRepository : GenericRepository<StockBatch, long>, IStockB
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemAndWarehouseAsync(string itemCode, string warehouseCode, CancellationToken cancellationToken = default)
+    {
+        return await DbSet.Include(b => b.StockInventory)
+            .Where(b => b.AvailableQty > 0 && b.Status == BatchStatus.Available && b.StockInventory != null
+                && b.StockInventory.ItemCode == itemCode && b.StockInventory.WarehouseCode == warehouseCode)
+            .OrderBy(b => b.ReceivedDate).ThenBy(b => b.BatchId).ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<StockBatch>> GetAvailableBatchesByItemsAndBranchAsync(
         IReadOnlyCollection<string> itemCodes,
         string branchCode,

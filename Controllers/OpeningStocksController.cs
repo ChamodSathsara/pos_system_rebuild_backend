@@ -40,6 +40,7 @@ public class OpeningStocksController : BaseApiController
             request,
             CurrentUserCode,
             CurrentBranchCode,
+            CurrentWarehouseCode,
             CurrentRole,
             cancellationToken);
 

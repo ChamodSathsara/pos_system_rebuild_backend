@@ -5,7 +5,8 @@ namespace PosApi.DTOs.Stock;
 public class CreateOpeningStockDto
 {
     public string ItemCode { get; set; } = string.Empty;
-    public string BranchCode { get; set; } = string.Empty;
+    /// <summary>Required for branch warehouses; null for a central warehouse.</summary>
+    public string? BranchCode { get; set; }
     public string WarehouseCode { get; set; } = string.Empty;
 
     public decimal Quantity { get; set; }

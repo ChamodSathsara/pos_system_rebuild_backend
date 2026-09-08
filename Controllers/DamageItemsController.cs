@@ -58,7 +58,7 @@ public class DamageItemsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateDamageItemDto request, CancellationToken cancellationToken)
     {
-        var damageItem = await _damageItemService.CreateAsync(request, CurrentUserCode, cancellationToken);
+        var damageItem = await _damageItemService.CreateAsync(request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, cancellationToken);
 
         return CreatedAtAction(
             nameof(GetById),

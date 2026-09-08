@@ -27,25 +27,23 @@ public class OpeningStockService : IOpeningStockService
         CreateOpeningStockDto request,
         string createdBy,
         string? userBranchCode,
+        string? userWarehouseCode,
         string? userRole,
         CancellationToken cancellationToken = default)
     {
         var itemCode = request.ItemCode.Trim();
-        var branchCode = request.BranchCode.Trim();
+        var branchCode = string.IsNullOrWhiteSpace(request.BranchCode) ? null : request.BranchCode.Trim();
         var warehouseCode = request.WarehouseCode.Trim();
         var batchNo = await _unitOfWork.StockBatches.GenerateNextBatchNoAsync(cancellationToken);
         var openingDate = request.OpeningDate ?? DateTime.UtcNow;
 
-        ValidateBranchAccess(
-            branchCode,
-            userBranchCode,
-            userRole);
-
-        var product = await ValidateReferencesAsync(
+        var (product, warehouse) = await ValidateReferencesAsync(
             itemCode,
             branchCode,
             warehouseCode,
             cancellationToken);
+
+        ValidateWarehouseAccess(warehouse, branchCode, userBranchCode, userWarehouseCode, userRole);
 
         product.SellingPrice = request.SellingPrice;
         product.UpdatedAt = DateTime.UtcNow;
@@ -93,7 +91,7 @@ public class OpeningStockService : IOpeningStockService
         {
             throw new ConflictException(
                 $"Opening stock has already been applied to item " +
-                $"'{itemCode}' in branch '{branchCode}' and " +
+                $"'{itemCode}' in warehouse '{warehouseCode}' and " +
                 $"warehouse '{warehouseCode}'.");
         }
 
@@ -119,7 +117,7 @@ public class OpeningStockService : IOpeningStockService
 
         var referenceNo =
             string.IsNullOrWhiteSpace(request.ReferenceNo)
-                ? $"OPEN-{itemCode}-{branchCode}-{openingDate:yyyyMMdd}"
+                ? $"OPEN-{itemCode}-{warehouseCode}-{openingDate:yyyyMMdd}"
                 : request.ReferenceNo.Trim();
 
         var batchRequest = new CreateStockBatchDto
@@ -172,9 +170,9 @@ public class OpeningStockService : IOpeningStockService
         };
     }
 
-    private async Task<ProductMaster> ValidateReferencesAsync(
+    private async Task<(ProductMaster Product, Warehouse Warehouse)> ValidateReferencesAsync(
         string itemCode,
-        string branchCode,
+        string? branchCode,
         string warehouseCode,
         CancellationToken cancellationToken)
     {
@@ -189,17 +187,6 @@ public class OpeningStockService : IOpeningStockService
                 itemCode);
         }
 
-        var branch = await _unitOfWork.Branches.GetByIdAsync(
-            branchCode,
-            cancellationToken);
-
-        if (branch is null)
-        {
-            throw new NotFoundException(
-                "Branch",
-                branchCode);
-        }
-
         var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(
             warehouseCode,
             cancellationToken);
@@ -211,23 +198,24 @@ public class OpeningStockService : IOpeningStockService
                 warehouseCode);
         }
 
-        // Warehouse එක request කළ branch එකට අයිතිද කියලා check කරනවා.
-        if (!string.Equals(
-                warehouse.BranchCode,
-                branchCode,
-                StringComparison.OrdinalIgnoreCase))
+        if (warehouse.IsCentralWarehouse)
         {
-            throw new ConflictException(
-                $"Warehouse '{warehouseCode}' does not belong " +
-                $"to branch '{branchCode}'.");
+            if (!string.IsNullOrWhiteSpace(branchCode)) throw new ConflictException("Central warehouse opening stock must not include a branch code.");
         }
-
-        return product;
+        else
+        {
+            if (string.IsNullOrWhiteSpace(branchCode)) throw new ConflictException("Branch code is required for a branch warehouse.");
+            var branch = await _unitOfWork.Branches.GetByIdAsync(branchCode, cancellationToken) ?? throw new NotFoundException("Branch", branchCode);
+            if (!string.Equals(warehouse.BranchCode, branch.BranchCode, StringComparison.OrdinalIgnoreCase)) throw new ConflictException($"Warehouse '{warehouseCode}' does not belong to branch '{branchCode}'.");
+        }
+        return (product, warehouse);
     }
 
-    private static void ValidateBranchAccess(
-        string requestedBranchCode,
+    private static void ValidateWarehouseAccess(
+        Warehouse warehouse,
+        string? requestedBranchCode,
         string? userBranchCode,
+        string? userWarehouseCode,
         string? userRole)
     {
         var isHeadOfficeUser =
@@ -245,19 +233,15 @@ public class OpeningStockService : IOpeningStockService
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(userBranchCode))
+        if (warehouse.IsCentralWarehouse)
         {
-            throw new UnauthorizedAccessException(
-                "The current user is not assigned to a branch.");
+            if (!string.Equals(userRole, "InventoryClerk", StringComparison.OrdinalIgnoreCase) || !string.Equals(userWarehouseCode, warehouse.WarehouseCode, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Only the InventoryClerk assigned to this central warehouse can add its stock.");
+            return;
         }
-
-        if (!string.Equals(
-                requestedBranchCode,
-                userBranchCode,
-                StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(userBranchCode) || !string.Equals(requestedBranchCode, userBranchCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new UnauthorizedAccessException(
-                "You cannot apply opening stock to another branch.");
+            throw new UnauthorizedAccessException("You cannot apply opening stock to another branch.");
         }
     }
 }
