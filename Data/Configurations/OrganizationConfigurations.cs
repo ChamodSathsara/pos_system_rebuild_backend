@@ -28,7 +28,7 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
     {
         builder.ToTable("branch");
         builder.HasKey(x => x.BranchCode);
-        builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50).IsRequired();
+        builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
         builder.Property(x => x.BranchName).HasColumnName("branch_name").HasMaxLength(100).IsRequired();
         builder.Property(x => x.Address).HasColumnName("address").HasMaxLength(255);
         builder.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(20);

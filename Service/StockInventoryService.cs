@@ -43,7 +43,7 @@ public class StockInventoryService : IStockInventoryService
     public async Task<StockInventoryDto> CreateAsync(CreateStockInventoryDto request, CancellationToken cancellationToken = default)
     {
         var itemCode = request.ItemCode.Trim();
-        var branchCode = request.BranchCode.Trim();
+        var branchCode = request.BranchCode?.Trim();
         var warehouseCode = request.WarehouseCode.Trim();
 
         if (!await _unitOfWork.Products.ItemCodeExistsAsync(itemCode, cancellationToken))
@@ -51,14 +51,15 @@ public class StockInventoryService : IStockInventoryService
             throw new BadRequestException($"Product '{itemCode}' does not exist.");
         }
 
-        if (!await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
+        var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(warehouseCode, cancellationToken)
+            ?? throw new BadRequestException($"Warehouse '{warehouseCode}' does not exist.");
+        if (warehouse.IsCentralWarehouse)
         {
-            throw new BadRequestException($"Branch '{branchCode}' does not exist.");
+            if (!string.IsNullOrWhiteSpace(branchCode)) throw new BadRequestException("Central warehouse stock must not have a branch code.");
         }
-
-        if (!await _unitOfWork.Warehouses.WarehouseCodeExistsAsync(warehouseCode, cancellationToken))
+        else if (string.IsNullOrWhiteSpace(branchCode) || !string.Equals(branchCode, warehouse.BranchCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new BadRequestException($"Warehouse '{warehouseCode}' does not exist.");
+            throw new BadRequestException("Branch stock must use the warehouse's assigned branch.");
         }
 
         if (await _unitOfWork.StockInventories.GetByCombinationAsync(itemCode, branchCode, warehouseCode, cancellationToken) is not null)

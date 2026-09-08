@@ -10,7 +10,7 @@ public class StockInventoryRepository : GenericRepository<StockInventory, int>, 
     {
     }
 
-    public async Task<StockInventory?> GetByCombinationAsync(string itemCode, string branchCode, string warehouseCode, CancellationToken cancellationToken = default)
+    public async Task<StockInventory?> GetByCombinationAsync(string itemCode, string? branchCode, string warehouseCode, CancellationToken cancellationToken = default)
     {
         return await DbSet.FirstOrDefaultAsync(
             s => s.ItemCode == itemCode && s.BranchCode == branchCode && s.WarehouseCode == warehouseCode,

@@ -4,7 +4,7 @@ namespace PosApi.Repository;
 
 public interface IStockInventoryRepository : IGenericRepository<StockInventory, int>
 {
-    Task<StockInventory?> GetByCombinationAsync(string itemCode, string branchCode, string warehouseCode, CancellationToken cancellationToken = default);
+    Task<StockInventory?> GetByCombinationAsync(string itemCode, string? branchCode, string warehouseCode, CancellationToken cancellationToken = default);
 
     Task<StockInventory?> GetByIdWithBatchesAsync(int stockId, CancellationToken cancellationToken = default);
 

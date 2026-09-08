@@ -19,7 +19,8 @@ public class Company
 
 public class Branch
 {
-    public string BranchCode { get; set; } = null!;
+    /// <summary>Null for a common central warehouse; required for a branch warehouse.</summary>
+    public string? BranchCode { get; set; }
     public string BranchName { get; set; } = null!;
     public string? Address { get; set; }
     public string? Phone { get; set; }

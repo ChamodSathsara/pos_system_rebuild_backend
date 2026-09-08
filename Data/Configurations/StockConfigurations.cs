@@ -12,7 +12,7 @@ public class StockInventoryConfiguration : IEntityTypeConfiguration<StockInvento
         builder.HasKey(x => x.StockId);
         builder.Property(x => x.StockId).HasColumnName("stock_id").ValueGeneratedOnAdd();
         builder.Property(x => x.ItemCode).HasColumnName("item_code").HasMaxLength(50).IsRequired();
-        builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50).IsRequired();
+        builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
         builder.Property(x => x.WarehouseCode).HasColumnName("warehouse_code").HasMaxLength(50).IsRequired();
         builder.Property(x => x.CurrentQty).HasColumnName("current_qty").HasColumnType("decimal(18,3)").IsRequired();
         builder.Property(x => x.LastUpdated).HasColumnName("last_updated").IsRequired();

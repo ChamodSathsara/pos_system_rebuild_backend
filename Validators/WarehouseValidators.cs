@@ -16,9 +16,8 @@ public class CreateWarehouseValidator : AbstractValidator<CreateWarehouseDto>
             .MaximumLength(100);
 
         RuleFor(x => x.Address).MaximumLength(255);
-        RuleFor(x => x.BranchCode)
-            .NotEmpty().WithMessage("Branch is required.")
-            .MaximumLength(50);
+        RuleFor(x => x.BranchCode).NotEmpty().WithMessage("Branch is required for a branch warehouse.").When(x => !x.IsCentralWarehouse);
+        RuleFor(x => x.BranchCode).Empty().WithMessage("A central warehouse cannot be assigned to a branch.").When(x => x.IsCentralWarehouse);
     }
 }
 
@@ -31,8 +30,7 @@ public class UpdateWarehouseValidator : AbstractValidator<UpdateWarehouseDto>
             .MaximumLength(100);
 
         RuleFor(x => x.Address).MaximumLength(255);
-        RuleFor(x => x.BranchCode)
-            .NotEmpty().WithMessage("Branch is required.")
-            .MaximumLength(50);
+        RuleFor(x => x.BranchCode).NotEmpty().WithMessage("Branch is required for a branch warehouse.").When(x => !x.IsCentralWarehouse);
+        RuleFor(x => x.BranchCode).Empty().WithMessage("A central warehouse cannot be assigned to a branch.").When(x => x.IsCentralWarehouse);
     }
 }

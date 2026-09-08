@@ -42,10 +42,7 @@ public class WarehouseService : IWarehouseService
         var warehouseCode = request.WarehouseCode?.Trim();
         var branchCode = request.BranchCode?.Trim();
 
-        if (string.IsNullOrWhiteSpace(branchCode))
-        {
-            throw new BadRequestException("Branch is required.");
-        }
+        ValidateWarehouseType(request.IsCentralWarehouse, branchCode, request.ParentWarehouseCode);
 
         if (string.IsNullOrWhiteSpace(warehouseCode))
         {
@@ -56,13 +53,13 @@ public class WarehouseService : IWarehouseService
             throw new ConflictException($"A warehouse with code '{warehouseCode}' already exists.");
         }
 
-        if (!await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
+        if (!request.IsCentralWarehouse && !await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode!, cancellationToken))
         {
             throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
         var parentWarehouseCode = request.ParentWarehouseCode?.Trim();
-        if (!string.IsNullOrWhiteSpace(parentWarehouseCode))
+        if (!request.IsCentralWarehouse && !string.IsNullOrWhiteSpace(parentWarehouseCode))
         {
             var parent = await _unitOfWork.Warehouses.GetByIdAsync(parentWarehouseCode, cancellationToken)
                 ?? throw new BadRequestException($"Parent warehouse '{parentWarehouseCode}' does not exist.");
@@ -96,18 +93,15 @@ public class WarehouseService : IWarehouseService
             ?? throw new NotFoundException("Warehouse", warehouseCode);
 
         var branchCode = request.BranchCode?.Trim();
-        if (string.IsNullOrWhiteSpace(branchCode))
-        {
-            throw new BadRequestException("Branch is required.");
-        }
+        ValidateWarehouseType(request.IsCentralWarehouse, branchCode, request.ParentWarehouseCode);
 
-        if (!await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode, cancellationToken))
+        if (!request.IsCentralWarehouse && !await _unitOfWork.Branches.BranchCodeExistsAsync(branchCode!, cancellationToken))
         {
             throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
         var parentWarehouseCode = request.ParentWarehouseCode?.Trim();
-        if (!string.IsNullOrWhiteSpace(parentWarehouseCode))
+        if (!request.IsCentralWarehouse && !string.IsNullOrWhiteSpace(parentWarehouseCode))
         {
             if (string.Equals(parentWarehouseCode, warehouseCode, StringComparison.OrdinalIgnoreCase))
                 throw new BadRequestException("A warehouse cannot be its own parent.");
@@ -130,6 +124,16 @@ public class WarehouseService : IWarehouseService
         _logger.LogInformation("Warehouse {WarehouseCode} updated successfully", warehouse.WarehouseCode);
 
         return _mapper.Map<WarehouseDto>(warehouse);
+    }
+
+    private static void ValidateWarehouseType(bool isCentralWarehouse, string? branchCode, string? parentWarehouseCode)
+    {
+        if (isCentralWarehouse && !string.IsNullOrWhiteSpace(branchCode))
+            throw new BadRequestException("A central warehouse must not be assigned to a branch.");
+        if (isCentralWarehouse && !string.IsNullOrWhiteSpace(parentWarehouseCode))
+            throw new BadRequestException("A central warehouse cannot have a parent warehouse.");
+        if (!isCentralWarehouse && string.IsNullOrWhiteSpace(branchCode))
+            throw new BadRequestException("Branch is required for a branch warehouse.");
     }
 
     public async Task DeleteAsync(string warehouseCode, CancellationToken cancellationToken = default)

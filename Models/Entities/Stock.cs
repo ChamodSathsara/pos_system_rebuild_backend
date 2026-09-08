@@ -6,7 +6,7 @@ public class StockInventory
 {
     public int StockId { get; set; }
     public string ItemCode { get; set; } = null!;
-    public string BranchCode { get; set; } = null!;
+    public string? BranchCode { get; set; }
     public string WarehouseCode { get; set; } = null!;
     public decimal CurrentQty { get; set; }
     public DateTime LastUpdated { get; set; }
