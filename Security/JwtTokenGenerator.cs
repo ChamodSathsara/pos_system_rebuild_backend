@@ -50,6 +50,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim(ClaimConstants.BranchCode, user.BranchCode));
         }
 
+        if (!string.IsNullOrWhiteSpace(user.WarehouseCode))
+        {
+            claims.Add(new Claim(ClaimConstants.WarehouseCode, user.WarehouseCode));
+        }
+
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 

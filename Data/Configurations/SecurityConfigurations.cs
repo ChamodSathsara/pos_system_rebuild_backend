@@ -73,6 +73,7 @@ public class SystemUserConfiguration : IEntityTypeConfiguration<SystemUser>
         builder.Property(x => x.Email).HasColumnName("email").HasMaxLength(100);
         builder.Property(x => x.Mobile).HasColumnName("mobile").HasMaxLength(20);
         builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
+        builder.Property(x => x.WarehouseCode).HasColumnName("warehouse_code").HasMaxLength(50);
         builder.Property(x => x.RoleId).HasColumnName("role_id");
         builder.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(x => x.LastLogin).HasColumnName("last_login");
@@ -84,6 +85,11 @@ public class SystemUserConfiguration : IEntityTypeConfiguration<SystemUser>
         builder.HasOne(x => x.Branch)
             .WithMany(x => x.SystemUsers)
             .HasForeignKey(x => x.BranchCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.Warehouse)
+            .WithMany()
+            .HasForeignKey(x => x.WarehouseCode)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Role)

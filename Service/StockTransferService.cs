@@ -45,9 +45,10 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         return (await query.OrderByDescending(x => x.CreatedAt).ToListAsync(ct)).Select(ToDto).ToList();
     }
 
-    public async Task<StockTransferRequestDto> AcceptAsync(long id, AcceptStockTransferRequestDto request, string userCode, CancellationToken ct = default)
+    public async Task<StockTransferRequestDto> AcceptAsync(long id, AcceptStockTransferRequestDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
     {
         var transfer = await RequestAsync(id, ct);
+        EnsureWarehouseAccess(transfer.SourceWarehouseCode, userWarehouseCode, role);
         if (transfer.Status != StockTransferStatus.Submitted) throw new ConflictException("Only submitted transfer requests can be accepted.");
         if (request.Lines.Count == 0) throw new BadRequestException("Approved quantities are required.");
         foreach (var line in transfer.Lines)
@@ -61,11 +62,12 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         await context.SaveChangesAsync(ct); return ToDto(transfer);
     }
 
-    public async Task<StockTransferDispatchDto> DispatchAsync(long id, CreateStockTransferDispatchDto request, string userCode, CancellationToken ct = default)
+    public async Task<StockTransferDispatchDto> DispatchAsync(long id, CreateStockTransferDispatchDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
     {
         if (request.Lines.Count == 0 || request.Lines.Any(x => x.Quantity <= 0)) throw new BadRequestException("At least one batch and dispatch quantity are required.");
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         var transfer = await RequestAsync(id, ct);
+        EnsureWarehouseAccess(transfer.SourceWarehouseCode, userWarehouseCode, role);
         if (transfer.Status is not StockTransferStatus.Accepted and not StockTransferStatus.Picking) throw new ConflictException("Only accepted requests can be dispatched.");
         var duplicateLines = request.Lines.GroupBy(x => new { x.TransferRequestLineId, x.BatchId }).Any(x => x.Count() > 1);
         if (duplicateLines) throw new BadRequestException("A request line/batch combination can only be dispatched once.");
@@ -143,6 +145,12 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
     private async Task<Warehouse> WarehouseAsync(string code, CancellationToken ct) => await context.Warehouses.SingleOrDefaultAsync(x => x.WarehouseCode == code.Trim(), ct) ?? throw new NotFoundException("Warehouse", code);
     private async Task<StockTransferRequest> RequestAsync(long id, CancellationToken ct) => await context.StockTransferRequests.Include(x => x.Lines).Include(x => x.SourceWarehouse).Include(x => x.DestinationWarehouse).SingleOrDefaultAsync(x => x.TransferRequestId == id, ct) ?? throw new NotFoundException("StockTransferRequest", id);
     private static bool IsGlobalRole(string? role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
+    private static void EnsureWarehouseAccess(string sourceWarehouseCode, string? userWarehouseCode, string? role)
+    {
+        if (IsGlobalRole(role)) return;
+        if (!string.Equals(role, "InventoryClerk", StringComparison.OrdinalIgnoreCase)) throw new ForbiddenAppException("Only Main Warehouse staff can process stock requests.");
+        if (string.IsNullOrWhiteSpace(userWarehouseCode) || !string.Equals(sourceWarehouseCode, userWarehouseCode, StringComparison.OrdinalIgnoreCase)) throw new ForbiddenAppException("You can only process requests assigned to your warehouse.");
+    }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static StockTransferRequestDto ToDto(StockTransferRequest x) => new() { TransferRequestId = x.TransferRequestId, RequestNo = x.RequestNo, SourceWarehouseCode = x.SourceWarehouseCode, DestinationWarehouseCode = x.DestinationWarehouseCode, Status = x.Status, RequestDate = x.RequestDate, RequiredDate = x.RequiredDate, Remarks = x.Remarks, Lines = x.Lines.Select(l => new StockTransferRequestLineDto { TransferRequestLineId = l.TransferRequestLineId, ItemCode = l.ItemCode, RequestedQty = l.RequestedQty, ApprovedQty = l.ApprovedQty, DispatchedQty = l.DispatchedQty, ReceivedQty = l.ReceivedQty, Remarks = l.Remarks }).ToList() };
     private static StockTransferDispatchDto ToDto(StockTransferDispatch x) => new() { DispatchId = x.DispatchId, DispatchNo = x.DispatchNo, TransferRequestId = x.TransferRequestId, DispatchedAt = x.DispatchedAt, VehicleNo = x.VehicleNo, DriverName = x.DriverName, Lines = x.Lines.Select(l => new StockTransferDispatchLineDto { DispatchLineId = l.DispatchLineId, TransferRequestLineId = l.TransferRequestLineId, BatchId = l.BatchId, Quantity = l.Quantity, UnitCost = l.UnitCost }).ToList() };

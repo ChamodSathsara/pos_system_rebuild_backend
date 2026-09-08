@@ -34,4 +34,9 @@ public static class ClaimsPrincipalExtensions
     {
         return principal.FindFirstValue(ClaimConstants.BranchCode);
     }
+
+    public static string? GetWarehouseCode(this ClaimsPrincipal principal)
+    {
+        return principal.FindFirstValue(ClaimConstants.WarehouseCode);
+    }
 }

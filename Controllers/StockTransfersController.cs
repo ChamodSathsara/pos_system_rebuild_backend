@@ -24,11 +24,11 @@ public class StockTransfersController(IStockTransferService service) : BaseApiCo
 
     [HttpPost("{id:long}/accept")]
     [Authorize(Roles = "Admin,Manager,InventoryClerk")]
-    public async Task<IActionResult> Accept(long id, [FromBody] AcceptStockTransferRequestDto request, CancellationToken ct) => Ok(ApiResponse<StockTransferRequestDto>.SuccessResponse(await service.AcceptAsync(id, request, CurrentUserCode, ct), "Stock request accepted and added to the dispatch queue."));
+    public async Task<IActionResult> Accept(long id, [FromBody] AcceptStockTransferRequestDto request, CancellationToken ct) => Ok(ApiResponse<StockTransferRequestDto>.SuccessResponse(await service.AcceptAsync(id, request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct), "Stock request accepted and added to the dispatch queue."));
 
     [HttpPost("{id:long}/dispatch")]
     [Authorize(Roles = "Admin,Manager,InventoryClerk")]
-    public async Task<IActionResult> Dispatch(long id, [FromBody] CreateStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(await service.DispatchAsync(id, request, CurrentUserCode, ct), "Stock dispatched. Delivery note is ready."));
+    public async Task<IActionResult> Dispatch(long id, [FromBody] CreateStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferDispatchDto>.SuccessResponse(await service.DispatchAsync(id, request, CurrentUserCode, CurrentWarehouseCode, CurrentRole, ct), "Stock dispatched. Delivery note is ready."));
 
     [HttpPost("dispatches/{dispatchId:long}/receive")]
     public async Task<IActionResult> Receive(long dispatchId, [FromBody] ReceiveStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferReceiptDto>.SuccessResponse(await service.ReceiveAsync(dispatchId, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct), "Delivery received and branch stock updated."));

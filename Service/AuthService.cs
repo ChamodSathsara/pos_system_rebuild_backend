@@ -183,6 +183,7 @@ public class AuthService : IAuthService
             Email = user.Email,
             Mobile = user.Mobile,
             BranchCode = user.BranchCode,
+            WarehouseCode = user.WarehouseCode,
             RoleId = user.RoleId,
             RoleName = user.Role?.RoleName,
             IsActive = user.IsActive,

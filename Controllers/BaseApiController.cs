@@ -19,4 +19,7 @@ public abstract class BaseApiController : ControllerBase
 
     /// <summary>The caller's assigned branch_code, if present on the token. Null for head-office roles.</summary>
     protected string? CurrentBranchCode => User.GetBranchCode();
+
+    /// <summary>Assigned warehouse for warehouse-only users such as InventoryClerk.</summary>
+    protected string? CurrentWarehouseCode => User.GetWarehouseCode();
 }

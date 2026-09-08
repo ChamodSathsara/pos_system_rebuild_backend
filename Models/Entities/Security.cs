@@ -45,6 +45,8 @@ public class SystemUser
     public string? Email { get; set; }
     public string? Mobile { get; set; }
     public string? BranchCode { get; set; }
+    /// <summary>Assigned operating warehouse for warehouse users such as InventoryClerk.</summary>
+    public string? WarehouseCode { get; set; }
     public int? RoleId { get; set; }
     public bool IsActive { get; set; }
     public DateTime? LastLogin { get; set; }
@@ -52,6 +54,7 @@ public class SystemUser
     public DateTime? UpdatedAt { get; set; }
 
     public Branch? Branch { get; set; }
+    public Warehouse? Warehouse { get; set; }
     public UserRole? Role { get; set; }
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();

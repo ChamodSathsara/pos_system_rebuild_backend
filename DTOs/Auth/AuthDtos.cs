@@ -35,6 +35,7 @@ public class CurrentUserDto
     public string? Email { get; set; }
     public string? Mobile { get; set; }
     public string? BranchCode { get; set; }
+    public string? WarehouseCode { get; set; }
     public int? RoleId { get; set; }
     public string? RoleName { get; set; }
     public bool IsActive { get; set; }

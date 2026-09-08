@@ -23,6 +23,7 @@ public static class ClaimConstants
     public const string UserId = "user_id";
     public const string Role = "role";
     public const string BranchCode = "branch_code";
+    public const string WarehouseCode = "warehouse_code";
 }
 
 public static class CacheKeys

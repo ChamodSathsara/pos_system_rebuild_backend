@@ -67,6 +67,12 @@ public class SystemUserService : ISystemUserService
             throw new BadRequestException($"Branch '{request.BranchCode}' does not exist.");
         }
 
+        if (!string.IsNullOrWhiteSpace(request.WarehouseCode)
+            && !await _unitOfWork.Warehouses.WarehouseCodeExistsAsync(request.WarehouseCode, cancellationToken))
+        {
+            throw new BadRequestException($"Warehouse '{request.WarehouseCode}' does not exist.");
+        }
+
         if (request.RoleId.HasValue
             && await _unitOfWork.UserRoles.GetByIdAsync(request.RoleId.Value, cancellationToken) is null)
         {
@@ -82,6 +88,7 @@ public class SystemUserService : ISystemUserService
             Email = request.Email,
             Mobile = request.Mobile,
             BranchCode = request.BranchCode,
+            WarehouseCode = request.WarehouseCode,
             RoleId = request.RoleId,
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow
@@ -107,6 +114,12 @@ public class SystemUserService : ISystemUserService
             throw new BadRequestException($"Branch '{request.BranchCode}' does not exist.");
         }
 
+        if (!string.IsNullOrWhiteSpace(request.WarehouseCode)
+            && !await _unitOfWork.Warehouses.WarehouseCodeExistsAsync(request.WarehouseCode, cancellationToken))
+        {
+            throw new BadRequestException($"Warehouse '{request.WarehouseCode}' does not exist.");
+        }
+
         if (request.RoleId.HasValue
             && await _unitOfWork.UserRoles.GetByIdAsync(request.RoleId.Value, cancellationToken) is null)
         {
@@ -117,6 +130,7 @@ public class SystemUserService : ISystemUserService
         user.Email = request.Email;
         user.Mobile = request.Mobile;
         user.BranchCode = request.BranchCode;
+        user.WarehouseCode = request.WarehouseCode;
         user.RoleId = request.RoleId;
         user.IsActive = request.IsActive;
         user.UpdatedAt = DateTime.UtcNow;
