@@ -2438,7 +2438,6 @@ namespace PosApi.Migrations
                         .HasColumnName("address");
 
                     b.Property<string>("BranchCode")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("branch_code");
@@ -3186,8 +3185,7 @@ namespace PosApi.Migrations
                     b.HasOne("PosApi.Models.Entities.Branch", "Branch")
                         .WithMany("Warehouses")
                         .HasForeignKey("BranchCode")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PosApi.Models.Entities.Warehouse", "ParentWarehouse")
                         .WithMany("ChildWarehouses")

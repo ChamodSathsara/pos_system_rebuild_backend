@@ -19,8 +19,7 @@ public class Company
 
 public class Branch
 {
-    /// <summary>Null for a common central warehouse; required for a branch warehouse.</summary>
-    public string? BranchCode { get; set; }
+    public string BranchCode { get; set; } = null!;
     public string BranchName { get; set; } = null!;
     public string? Address { get; set; }
     public string? Phone { get; set; }
@@ -39,7 +38,8 @@ public class Warehouse
     public string WarehouseCode { get; set; } = null!;
     public string WarehouseName { get; set; } = null!;
     public string? Address { get; set; }
-    public string BranchCode { get; set; } = null!;
+    /// <summary>Null only for a common central warehouse.</summary>
+    public string? BranchCode { get; set; }
     public bool IsActive { get; set; }
     public DateTime? CreatedAt { get; set; }
 
