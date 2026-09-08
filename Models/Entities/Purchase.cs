@@ -6,6 +6,10 @@ public class PurchaseOrder
 {
     public string PoNo { get; set; } = null!;
     public int? VendorId { get; set; }
+    public string? SourceWarehouseCode { get; set; }
+    public string? DestinationWarehouseCode { get; set; }
+    public bool IsInternalTransfer { get; set; }
+    public long? TransferRequestId { get; set; }
     public string? BranchCode { get; set; }
     public DateTime? PoDate { get; set; }
     public DateTime? ExpectedDate { get; set; }
@@ -17,6 +21,8 @@ public class PurchaseOrder
     public DateTime? UpdatedAt { get; set; }
 
     public Vendor? Vendor { get; set; }
+    public Warehouse? SourceWarehouse { get; set; }
+    public Warehouse? DestinationWarehouse { get; set; }
     public Branch? Branch { get; set; }
     public SystemUser? CreatedByUser { get; set; }
     public ICollection<PurchaseOrderItem> Items { get; set; } = new List<PurchaseOrderItem>();

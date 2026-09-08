@@ -1,4 +1,6 @@
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using PosApi.Data;
 using PosApi.DTOs.Grn;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
@@ -13,12 +15,14 @@ public class GrnMasterService : IGrnMasterService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ILogger<GrnMasterService> _logger;
+    private readonly ApplicationDbContext _context;
 
-    public GrnMasterService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<GrnMasterService> logger)
+    public GrnMasterService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<GrnMasterService> logger, ApplicationDbContext context)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _logger = logger;
+        _context = context;
     }
 
     public async Task<IReadOnlyList<GrnDto>> SearchAsync(
@@ -58,17 +62,21 @@ public class GrnMasterService : IGrnMasterService
             throw new ConflictException($"Purchase order '{request.PoNo}' is {order.Status} and cannot receive any more GRNs.");
         }
 
-        if (order.VendorId is null)
+        var isInternalPo = order.IsInternalTransfer && !string.IsNullOrWhiteSpace(order.SourceWarehouseCode);
+        if (!isInternalPo)
         {
-            throw new ConflictException($"Purchase order '{request.PoNo}' has no vendor assigned.");
+            if (order.VendorId is null) throw new ConflictException($"Purchase order '{request.PoNo}' has no vendor assigned.");
+            var vendor = await _unitOfWork.Vendors.GetByIdAsync(order.VendorId.Value, cancellationToken) ?? throw new NotFoundException("Vendor", order.VendorId.Value);
+            if (!vendor.IsActive) throw new BadRequestException($"Vendor '{vendor.VendorCode}' is inactive and cannot receive new GRNs.");
         }
-
-        var vendor = await _unitOfWork.Vendors.GetByIdAsync(order.VendorId.Value, cancellationToken)
-            ?? throw new NotFoundException("Vendor", order.VendorId.Value);
-
-        if (!vendor.IsActive)
+        else
         {
-            throw new BadRequestException($"Vendor '{vendor.VendorCode}' is inactive and cannot receive new GRNs.");
+            var source = await _unitOfWork.Warehouses.GetByIdAsync(order.SourceWarehouseCode!, cancellationToken) ?? throw new NotFoundException("CentralWarehouse", order.SourceWarehouseCode);
+            if (!source.IsCentralWarehouse) throw new ConflictException($"Purchase order '{request.PoNo}' does not reference a valid central warehouse.");
+            if (!string.Equals(order.DestinationWarehouseCode, request.WarehouseCode, StringComparison.OrdinalIgnoreCase)) throw new ConflictException("This internal PO must be received into its selected destination warehouse.");
+            if (!order.TransferRequestId.HasValue) throw new ConflictException("This internal PO has no linked central dispatch request.");
+            var transfer = await _context.StockTransferRequests.SingleOrDefaultAsync(x => x.TransferRequestId == order.TransferRequestId.Value, cancellationToken);
+            if (transfer is null || transfer.Status != StockTransferStatus.Dispatched) throw new ConflictException("Central warehouse must dispatch this internal PO before branch GRN can be posted.");
         }
 
         var branchCode = request.BranchCode.Trim();
@@ -202,6 +210,7 @@ public class GrnMasterService : IGrnMasterService
                 ReceivedQty = grnItem.Quantity ?? 0,
                 AvailableQty = grnItem.Quantity ?? 0,
                 UnitCost = grnItem.UnitCost ?? 0,
+                SellingPrice = request.Items.First(x => x.ItemCode == grnItem.ItemCode).SellingPrice,
                 ExpiryDate = grnItem.ExpiryDate,
                 ReceivedDate = grnDate,
                 Status = BatchStatus.Available
@@ -257,12 +266,14 @@ public class GrnMasterService : IGrnMasterService
         }, cancellationToken);
 
         // ---- 8. vendor_ledger ----
-        var ledger = await _unitOfWork.VendorLedgers.GetByVendorIdAsync(order.VendorId.Value, cancellationToken)
-            ?? throw new NotFoundException($"No ledger was found for vendor id '{order.VendorId.Value}'.");
-
-        ledger.GrnTotal = (ledger.GrnTotal ?? 0) + grnTotal;
-        ledger.OutstandingBalance = (ledger.GrnTotal ?? 0) - (ledger.ReturnTotal ?? 0) - (ledger.PaidCredit ?? 0);
-        _unitOfWork.VendorLedgers.Update(ledger);
+        if (!isInternalPo)
+        {
+            var ledger = await _unitOfWork.VendorLedgers.GetByVendorIdAsync(order.VendorId!.Value, cancellationToken)
+                ?? throw new NotFoundException($"No ledger was found for vendor id '{order.VendorId.Value}'.");
+            ledger.GrnTotal = (ledger.GrnTotal ?? 0) + grnTotal;
+            ledger.OutstandingBalance = (ledger.GrnTotal ?? 0) - (ledger.ReturnTotal ?? 0) - (ledger.PaidCredit ?? 0);
+            _unitOfWork.VendorLedgers.Update(ledger);
+        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

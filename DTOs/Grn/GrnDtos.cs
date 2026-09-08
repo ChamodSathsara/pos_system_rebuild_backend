@@ -5,6 +5,8 @@ public class CreateGrnItemLineDto
     public string ItemCode { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
+    /// <summary>Selling price for this received batch; may differ between batches.</summary>
+    public decimal? SellingPrice { get; set; }
 
     /// <summary>Optional. Auto-generated from the GRN number and item code when omitted.</summary>
     public string? BatchNo { get; set; }

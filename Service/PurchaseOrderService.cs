@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using PosApi.DTOs.Purchase;
+using PosApi.Data;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
 using PosApi.Models.Enums;
@@ -13,12 +14,14 @@ public class PurchaseOrderService : IPurchaseOrderService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ILogger<PurchaseOrderService> _logger;
+    private readonly ApplicationDbContext _context;
 
-    public PurchaseOrderService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<PurchaseOrderService> logger)
+    public PurchaseOrderService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<PurchaseOrderService> logger, ApplicationDbContext context)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _logger = logger;
+        _context = context;
     }
 
     public async Task<IReadOnlyList<PurchaseOrderDto>> SearchAsync(
@@ -43,12 +46,20 @@ public class PurchaseOrderService : IPurchaseOrderService
 
     public async Task<PurchaseOrderDto> CreateAsync(CreatePurchaseOrderDto request, string createdBy, CancellationToken cancellationToken = default)
     {
-        var vendor = await _unitOfWork.Vendors.GetByIdAsync(request.VendorId, cancellationToken)
-            ?? throw new NotFoundException("Vendor", request.VendorId);
-
-        if (!vendor.IsActive)
+        var isInternal = !string.IsNullOrWhiteSpace(request.SourceWarehouseCode);
+        Warehouse? sourceWarehouse = null;
+        Warehouse? destinationWarehouse = null;
+        if (isInternal)
         {
-            throw new BadRequestException($"Vendor '{vendor.VendorCode}' is inactive and cannot receive new purchase orders.");
+            sourceWarehouse = await _unitOfWork.Warehouses.GetByIdAsync(request.SourceWarehouseCode!, cancellationToken) ?? throw new NotFoundException("Warehouse", request.SourceWarehouseCode);
+            destinationWarehouse = await _unitOfWork.Warehouses.GetByIdAsync(request.DestinationWarehouseCode!, cancellationToken) ?? throw new NotFoundException("Warehouse", request.DestinationWarehouseCode);
+            if (!sourceWarehouse.IsCentralWarehouse) throw new BadRequestException("Internal PO source must be a central warehouse.");
+            if (destinationWarehouse.IsCentralWarehouse || !string.Equals(destinationWarehouse.BranchCode, request.BranchCode, StringComparison.OrdinalIgnoreCase)) throw new BadRequestException("Internal PO destination must belong to the PO branch.");
+        }
+        else
+        {
+            var vendor = await _unitOfWork.Vendors.GetByIdAsync(request.VendorId!.Value, cancellationToken) ?? throw new NotFoundException("Vendor", request.VendorId);
+            if (!vendor.IsActive) throw new BadRequestException($"Vendor '{vendor.VendorCode}' is inactive and cannot receive new purchase orders.");
         }
 
         if (await _unitOfWork.Branches.GetByIdAsync(request.BranchCode, cancellationToken) is null)
@@ -93,6 +104,9 @@ public class PurchaseOrderService : IPurchaseOrderService
         {
             PoNo = poNo,
             VendorId = request.VendorId,
+            SourceWarehouseCode = sourceWarehouse?.WarehouseCode,
+            DestinationWarehouseCode = destinationWarehouse?.WarehouseCode,
+            IsInternalTransfer = isInternal,
             BranchCode = request.BranchCode,
             PoDate = request.PoDate ?? DateTime.UtcNow,
             ExpectedDate = request.ExpectedDate,
@@ -117,6 +131,22 @@ public class PurchaseOrderService : IPurchaseOrderService
         }, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (isInternal)
+        {
+            var transfer = new StockTransferRequest
+            {
+                RequestNo = poNo, SourceWarehouseCode = sourceWarehouse!.WarehouseCode, DestinationWarehouseCode = destinationWarehouse!.WarehouseCode,
+                RequestDate = order.PoDate ?? DateTime.UtcNow, RequiredDate = order.ExpectedDate, Status = StockTransferStatus.Submitted,
+                Remarks = order.Remarks, RequestedBy = createdBy, CreatedAt = DateTime.UtcNow,
+                Lines = items.Select(x => new StockTransferRequestLine { ItemCode = x.ItemCode!, RequestedQty = x.Quantity ?? 0, Remarks = $"Created from internal PO {poNo}" }).ToList()
+            };
+            _context.StockTransferRequests.Add(transfer);
+            await _context.SaveChangesAsync(cancellationToken);
+            order.TransferRequestId = transfer.TransferRequestId;
+            _unitOfWork.PurchaseOrders.Update(order);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         _logger.LogInformation("Purchase order {PoNo} created for vendor {VendorId}, total {TotalAmount:N2}", poNo, request.VendorId, totalAmount);
 

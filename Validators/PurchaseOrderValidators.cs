@@ -18,7 +18,9 @@ public class CreatePurchaseOrderValidator : AbstractValidator<CreatePurchaseOrde
     public CreatePurchaseOrderValidator()
     {
         RuleFor(x => x.PoNo).MaximumLength(50);
-        RuleFor(x => x.VendorId).GreaterThan(0).WithMessage("VendorId is required.");
+        RuleFor(x => x).Must(x => x.VendorId.HasValue || !string.IsNullOrWhiteSpace(x.SourceWarehouseCode)).WithMessage("Select either an external vendor or a central warehouse.");
+        RuleFor(x => x).Must(x => !(x.VendorId.HasValue && !string.IsNullOrWhiteSpace(x.SourceWarehouseCode))).WithMessage("Select either an external vendor or a central warehouse, not both.");
+        RuleFor(x => x.DestinationWarehouseCode).NotEmpty().When(x => !string.IsNullOrWhiteSpace(x.SourceWarehouseCode));
         RuleFor(x => x.BranchCode).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Remarks).MaximumLength(255);
         RuleFor(x => x.Items).NotEmpty().WithMessage("A purchase order must contain at least one line item.");

@@ -12,6 +12,10 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
         builder.HasKey(x => x.PoNo);
         builder.Property(x => x.PoNo).HasColumnName("po_no").HasMaxLength(50);
         builder.Property(x => x.VendorId).HasColumnName("vendor_id");
+        builder.Property(x => x.SourceWarehouseCode).HasColumnName("source_warehouse_code").HasMaxLength(50);
+        builder.Property(x => x.DestinationWarehouseCode).HasColumnName("destination_warehouse_code").HasMaxLength(50);
+        builder.Property(x => x.IsInternalTransfer).HasColumnName("is_internal_transfer").HasDefaultValue(false);
+        builder.Property(x => x.TransferRequestId).HasColumnName("transfer_request_id");
         builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
         builder.Property(x => x.PoDate).HasColumnName("po_date");
         builder.Property(x => x.ExpectedDate).HasColumnName("expected_date");
@@ -23,6 +27,8 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
         builder.HasOne(x => x.Vendor).WithMany(x => x.PurchaseOrders).HasForeignKey(x => x.VendorId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.SourceWarehouse).WithMany().HasForeignKey(x => x.SourceWarehouseCode).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.DestinationWarehouse).WithMany().HasForeignKey(x => x.DestinationWarehouseCode).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchCode).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
     }

@@ -13,7 +13,9 @@ public class CreatePurchaseOrderDto
 {
     /// <summary>Optional. Auto-generated (e.g. PO000001) when omitted.</summary>
     public string? PoNo { get; set; }
-    public int VendorId { get; set; }
+    public int? VendorId { get; set; }
+    public string? SourceWarehouseCode { get; set; }
+    public string? DestinationWarehouseCode { get; set; }
     public string BranchCode { get; set; } = string.Empty;
     public DateTime? PoDate { get; set; }
     public DateTime? ExpectedDate { get; set; }
@@ -54,6 +56,10 @@ public class PurchaseOrderDto
 {
     public string PoNo { get; set; } = string.Empty;
     public int? VendorId { get; set; }
+    public string? SourceWarehouseCode { get; set; }
+    public string? DestinationWarehouseCode { get; set; }
+    public bool IsInternalTransfer { get; set; }
+    public long? TransferRequestId { get; set; }
     public string? VendorCode { get; set; }
     public string? VendorName { get; set; }
     public string? BranchCode { get; set; }

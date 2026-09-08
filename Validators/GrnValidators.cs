@@ -10,6 +10,7 @@ public class CreateGrnItemLineValidator : AbstractValidator<CreateGrnItemLineDto
         RuleFor(x => x.ItemCode).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Quantity).GreaterThan(0).WithMessage("Quantity must be greater than zero.");
         RuleFor(x => x.UnitCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.SellingPrice).GreaterThanOrEqualTo(0).When(x => x.SellingPrice.HasValue);
         RuleFor(x => x.BatchNo).MaximumLength(50);
     }
 }
