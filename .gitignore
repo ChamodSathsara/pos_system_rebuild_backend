@@ -57,3 +57,6 @@ logs/
 
 # QZ Tray signing private key (must never be committed)
 App_Data/Qz/private-key.pem
+
+# Local verification output; it may contain deployment-only signing material.
+build-verify*/

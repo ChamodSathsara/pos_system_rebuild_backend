@@ -42,5 +42,13 @@ public class Warehouse
     public bool IsActive { get; set; }
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>Central warehouses distribute stock to branch warehouses.</summary>
+    public bool IsCentralWarehouse { get; set; }
+
+    /// <summary>Optional supplying central warehouse for a branch warehouse.</summary>
+    public string? ParentWarehouseCode { get; set; }
+
     public Branch? Branch { get; set; }
+    public Warehouse? ParentWarehouse { get; set; }
+    public ICollection<Warehouse> ChildWarehouses { get; set; } = new List<Warehouse>();
 }

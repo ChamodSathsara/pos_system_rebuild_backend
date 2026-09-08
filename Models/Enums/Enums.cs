@@ -72,6 +72,19 @@ public enum StockMovementType
     CostCorrection
 }
 
+/// <summary>Lifecycle of an internal stock request sent from one warehouse to another.</summary>
+public enum StockTransferStatus
+{
+    Draft,
+    Submitted,
+    Accepted,
+    Picking,
+    Dispatched,
+    Received,
+    Rejected,
+    Cancelled
+}
+
 public enum PaymentStatus
 {
     Pending,

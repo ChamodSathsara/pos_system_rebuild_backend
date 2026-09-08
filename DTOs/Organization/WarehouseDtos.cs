@@ -7,6 +7,8 @@ public class CreateWarehouseDto
     public string? Address { get; set; }
     public string BranchCode { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+    public bool IsCentralWarehouse { get; set; }
+    public string? ParentWarehouseCode { get; set; }
 }
 
 public class UpdateWarehouseDto
@@ -15,6 +17,8 @@ public class UpdateWarehouseDto
     public string? Address { get; set; }
     public string BranchCode { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public bool IsCentralWarehouse { get; set; }
+    public string? ParentWarehouseCode { get; set; }
 }
 
 public class WarehouseDto
@@ -25,4 +29,6 @@ public class WarehouseDto
     public string? BranchCode { get; set; }
     public bool IsActive { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public bool IsCentralWarehouse { get; set; }
+    public string? ParentWarehouseCode { get; set; }
 }

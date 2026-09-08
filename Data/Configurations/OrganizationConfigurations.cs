@@ -43,6 +43,7 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
             .WithMany(x => x.Branches)
             .HasForeignKey(x => x.CompanyCode)
             .OnDelete(DeleteBehavior.Restrict);
+
     }
 }
 
@@ -58,10 +59,17 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50).IsRequired();
         builder.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.IsCentralWarehouse).HasColumnName("is_central_warehouse").HasDefaultValue(false);
+        builder.Property(x => x.ParentWarehouseCode).HasColumnName("parent_warehouse_code").HasMaxLength(50);
 
         builder.HasOne(x => x.Branch)
             .WithMany(x => x.Warehouses)
             .HasForeignKey(x => x.BranchCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.ParentWarehouse)
+            .WithMany(x => x.ChildWarehouses)
+            .HasForeignKey(x => x.ParentWarehouseCode)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

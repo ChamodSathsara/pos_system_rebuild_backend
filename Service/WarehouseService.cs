@@ -61,6 +61,15 @@ public class WarehouseService : IWarehouseService
             throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
+        var parentWarehouseCode = request.ParentWarehouseCode?.Trim();
+        if (!string.IsNullOrWhiteSpace(parentWarehouseCode))
+        {
+            var parent = await _unitOfWork.Warehouses.GetByIdAsync(parentWarehouseCode, cancellationToken)
+                ?? throw new BadRequestException($"Parent warehouse '{parentWarehouseCode}' does not exist.");
+            if (!parent.IsCentralWarehouse)
+                throw new BadRequestException("A parent warehouse must be configured as a central warehouse.");
+        }
+
         var warehouse = new Warehouse
         {
             WarehouseCode = warehouseCode,
@@ -68,6 +77,8 @@ public class WarehouseService : IWarehouseService
             Address = request.Address,
             BranchCode = branchCode,
             IsActive = request.IsActive,
+            IsCentralWarehouse = request.IsCentralWarehouse,
+            ParentWarehouseCode = parentWarehouseCode,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -95,10 +106,23 @@ public class WarehouseService : IWarehouseService
             throw new BadRequestException($"Branch '{branchCode}' does not exist.");
         }
 
+        var parentWarehouseCode = request.ParentWarehouseCode?.Trim();
+        if (!string.IsNullOrWhiteSpace(parentWarehouseCode))
+        {
+            if (string.Equals(parentWarehouseCode, warehouseCode, StringComparison.OrdinalIgnoreCase))
+                throw new BadRequestException("A warehouse cannot be its own parent.");
+            var parent = await _unitOfWork.Warehouses.GetByIdAsync(parentWarehouseCode, cancellationToken)
+                ?? throw new BadRequestException($"Parent warehouse '{parentWarehouseCode}' does not exist.");
+            if (!parent.IsCentralWarehouse)
+                throw new BadRequestException("A parent warehouse must be configured as a central warehouse.");
+        }
+
         warehouse.WarehouseName = request.WarehouseName.Trim();
         warehouse.Address = request.Address;
         warehouse.BranchCode = branchCode;
         warehouse.IsActive = request.IsActive;
+        warehouse.IsCentralWarehouse = request.IsCentralWarehouse;
+        warehouse.ParentWarehouseCode = parentWarehouseCode;
 
         _unitOfWork.Warehouses.Update(warehouse);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

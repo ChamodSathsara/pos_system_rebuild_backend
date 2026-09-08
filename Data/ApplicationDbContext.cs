@@ -13,6 +13,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<StockTransferRequest> StockTransferRequests => Set<StockTransferRequest>();
+    public DbSet<StockTransferRequestLine> StockTransferRequestLines => Set<StockTransferRequestLine>();
+    public DbSet<StockTransferDispatch> StockTransferDispatches => Set<StockTransferDispatch>();
+    public DbSet<StockTransferDispatchLine> StockTransferDispatchLines => Set<StockTransferDispatchLine>();
+    public DbSet<StockTransferReceipt> StockTransferReceipts => Set<StockTransferReceipt>();
+    public DbSet<StockTransferReceiptLine> StockTransferReceiptLines => Set<StockTransferReceiptLine>();
 
     // Security (user_group replaced by user_role)
     public DbSet<UserRole> UserRoles => Set<UserRole>();
