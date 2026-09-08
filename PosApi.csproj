@@ -51,4 +51,9 @@
     <None Include="D:\GestetnerProjects\rebuild Pos web solution\backend\PosApi\.editorconfig" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="App_Data\Qz\digital-certificate.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="App_Data\Qz\private-key.pem" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

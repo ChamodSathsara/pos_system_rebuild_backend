@@ -8,10 +8,14 @@ namespace PosApi.Service;
 public class QzSigningService : IQzSigningService
 {
     private readonly QzSigningSettings _settings;
+    private readonly IHostEnvironment _environment;
 
-    public QzSigningService(IOptions<QzSigningSettings> settings)
+    public QzSigningService(
+        IOptions<QzSigningSettings> settings,
+        IHostEnvironment environment)
     {
         _settings = settings.Value;
+        _environment = environment;
     }
 
     public async Task<string> GetCertificateAsync(CancellationToken cancellationToken = default)
@@ -35,14 +39,16 @@ public class QzSigningService : IQzSigningService
         return Convert.ToBase64String(signature);
     }
 
-    private static string GetRequiredPath(string configuredPath, string description)
+    private string GetRequiredPath(string configuredPath, string description)
     {
         if (string.IsNullOrWhiteSpace(configuredPath))
         {
             throw new InvalidOperationException($"{description} path is not configured.");
         }
 
-        var fullPath = Path.GetFullPath(configuredPath);
+        var fullPath = Path.IsPathRooted(configuredPath)
+            ? Path.GetFullPath(configuredPath)
+            : Path.GetFullPath(configuredPath, _environment.ContentRootPath);
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException($"{description} file was not found.");

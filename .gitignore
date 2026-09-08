@@ -54,3 +54,6 @@ logs/
 *.tmp
 *.bak
 *~
+
+# QZ Tray signing private key (must never be committed)
+App_Data/Qz/private-key.pem
