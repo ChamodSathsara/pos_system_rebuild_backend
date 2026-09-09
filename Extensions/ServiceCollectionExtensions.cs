@@ -12,6 +12,7 @@ using PosApi.Security;
 using PosApi.Service;
 using PosApi.Service.Interfaces;
 using Microsoft.OpenApi;
+using PosApi.Data.Interceptors;
 
 namespace PosApi.Extensions;
 
@@ -22,12 +23,17 @@ public static class ServiceCollectionExtensions
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
 
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddHttpContextAccessor();
+        services.AddScoped<BusinessAuditInterceptor>();
+        services.AddDbContext<ApplicationDbContext>((provider, options) =>
+        {
             options.UseSqlServer(connectionString, sql =>
             {
                 sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
                 sql.EnableRetryOnFailure(maxRetryCount: 3);
-            }));
+            });
+            options.AddInterceptors(provider.GetRequiredService<BusinessAuditInterceptor>());
+        });
 
         return services;
     }

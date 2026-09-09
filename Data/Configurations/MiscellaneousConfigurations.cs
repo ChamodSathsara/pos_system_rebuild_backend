@@ -254,12 +254,21 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.ToTable("audit_log");
         builder.HasKey(x => x.LogId);
         builder.Property(x => x.LogId).HasColumnName("log_id").ValueGeneratedOnAdd();
+        builder.Property(x => x.TransactionId).HasColumnName("transaction_id");
         builder.Property(x => x.UserCode).HasColumnName("user_code").HasMaxLength(50);
         builder.Property(x => x.Action).HasColumnName("action").HasMaxLength(100);
-        builder.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(50);
-        builder.Property(x => x.RecordId).HasColumnName("record_id").HasMaxLength(50);
-        builder.Property(x => x.OldValue).HasColumnName("old_value").HasMaxLength(255);
-        builder.Property(x => x.NewValue).HasColumnName("new_value").HasMaxLength(255);
+        builder.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(100);
+        builder.Property(x => x.RecordId).HasColumnName("record_id").HasMaxLength(200);
+        builder.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100);
+        builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
+        builder.Property(x => x.WarehouseCode).HasColumnName("warehouse_code").HasMaxLength(50);
+        builder.Property(x => x.ActionStatus).HasColumnName("action_status").HasMaxLength(20);
+        builder.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(500);
+        builder.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(50);
+        builder.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(100);
+        builder.Property(x => x.Metadata).HasColumnName("metadata").HasColumnType("nvarchar(max)");
+        builder.Property(x => x.OldValue).HasColumnName("old_value").HasColumnType("nvarchar(max)");
+        builder.Property(x => x.NewValue).HasColumnName("new_value").HasColumnType("nvarchar(max)");
         builder.Property(x => x.ActionTime).HasColumnName("action_time");
     }
 }
