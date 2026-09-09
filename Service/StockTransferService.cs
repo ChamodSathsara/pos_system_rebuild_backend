@@ -42,7 +42,17 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         var query = context.StockTransferRequests.AsNoTracking().Include(x => x.Lines).Include(x => x.SourceWarehouse).Include(x => x.DestinationWarehouse).AsQueryable();
         if (!string.IsNullOrWhiteSpace(sourceWarehouseCode)) query = query.Where(x => x.SourceWarehouseCode == sourceWarehouseCode.Trim());
         if (!string.IsNullOrWhiteSpace(destinationWarehouseCode)) query = query.Where(x => x.DestinationWarehouseCode == destinationWarehouseCode.Trim());
-        return (await query.OrderByDescending(x => x.CreatedAt).ToListAsync(ct)).Select(ToDto).ToList();
+        var transfers = await query.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        var ids = transfers.Select(x => x.TransferRequestId).ToList();
+        var poNumbers = await context.PurchaseOrders.AsNoTracking()
+            .Where(x => x.TransferRequestId.HasValue && ids.Contains(x.TransferRequestId.Value))
+            .ToDictionaryAsync(x => x.TransferRequestId!.Value, x => x.PoNo, ct);
+        return transfers.Select(x =>
+        {
+            var dto = ToDto(x);
+            dto.LinkedPoNo = poNumbers.GetValueOrDefault(x.TransferRequestId);
+            return dto;
+        }).ToList();
     }
 
     public async Task<StockTransferRequestDto> GetRequestByIdAsync(long id, CancellationToken ct = default)
@@ -56,7 +66,12 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
             .SingleOrDefaultAsync(x => x.TransferRequestId == id, ct)
             ?? throw new NotFoundException("StockTransferRequest", id);
 
-        return ToDto(transfer);
+        var result = ToDto(transfer);
+        result.LinkedPoNo = await context.PurchaseOrders.AsNoTracking()
+            .Where(x => x.TransferRequestId == id)
+            .Select(x => x.PoNo)
+            .SingleOrDefaultAsync(ct);
+        return result;
     }
 
     public async Task<StockTransferRequestDto> AcceptAsync(long id, AcceptStockTransferRequestDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
@@ -100,6 +115,28 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
             context.StockMovements.Add(new StockMovement { BatchId = batch.BatchId, StockId = stock.StockId, MovementType = StockMovementType.Out, ReferenceType = StockReferenceType.StockTransfer, ReferenceNo = dispatch.DispatchNo, Qty = -dto.Quantity, PreviousQty = previous, NewQty = stock.CurrentQty, UnitCost = batch.UnitCost, Remarks = $"Dispatched to {transfer.DestinationWarehouseCode}", CreatedAt = now, CreatedBy = userCode });
             dispatch.Lines.Add(new StockTransferDispatchLine { TransferRequestLineId = line.TransferRequestLineId, BatchId = batch.BatchId, Quantity = dto.Quantity, UnitCost = batch.UnitCost });
             context.ItemLogs.Add(ItemLogFactory.Create(stock.ItemCode, ItemLogActions.StockChanged, previous.ToString(), stock.CurrentQty.ToString(), userCode));
+        }
+        var linkedPo = await context.PurchaseOrders.Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.TransferRequestId == transfer.TransferRequestId, ct);
+        if (linkedPo is not null)
+        {
+            foreach (var poItem in linkedPo.Items)
+            {
+                var dispatched = dispatch.Lines.Where(x => x.TransferRequestLine?.ItemCode == poItem.ItemCode).ToList();
+                if (dispatched.Count == 0)
+                {
+                    var transferLineIds = transfer.Lines.Where(x => x.ItemCode == poItem.ItemCode).Select(x => x.TransferRequestLineId).ToHashSet();
+                    dispatched = dispatch.Lines.Where(x => transferLineIds.Contains(x.TransferRequestLineId)).ToList();
+                }
+                var dispatchedQty = dispatched.Sum(x => x.Quantity);
+                if (dispatchedQty > 0)
+                {
+                    poItem.UnitCost = dispatched.Sum(x => x.Quantity * x.UnitCost) / dispatchedQty;
+                    poItem.TotalCost = (poItem.Quantity ?? 0) * poItem.UnitCost;
+                }
+            }
+            linkedPo.TotalAmount = linkedPo.Items.Sum(x => x.TotalCost ?? 0);
+            linkedPo.UpdatedAt = now;
         }
         transfer.Status = StockTransferStatus.Dispatched; transfer.UpdatedAt = now;
         // SaveChanges creates its own transaction. Do not start a user transaction here because
@@ -184,8 +221,70 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         transfer.AcceptedAt = DateTime.UtcNow;
         transfer.UpdatedAt = DateTime.UtcNow;
         transfer.Remarks = Clean(request.Remarks) ?? transfer.Remarks;
+        var existingPo = await context.PurchaseOrders.AnyAsync(x => x.TransferRequestId == transfer.TransferRequestId, ct);
+        if (!existingPo)
+        {
+            var poNo = await GenerateNextPoNoAsync(ct);
+            var now = DateTime.UtcNow;
+            context.PurchaseOrders.Add(new PurchaseOrder
+            {
+                PoNo = poNo,
+                VendorId = null,
+                SourceWarehouseCode = transfer.SourceWarehouseCode,
+                DestinationWarehouseCode = transfer.DestinationWarehouseCode,
+                IsInternalTransfer = true,
+                TransferRequestId = transfer.TransferRequestId,
+                BranchCode = destination.BranchCode,
+                PoDate = now,
+                ExpectedDate = transfer.RequiredDate,
+                TotalAmount = 0,
+                Remarks = transfer.Remarks,
+                Status = PurchaseOrderStatus.Open,
+                CreatedBy = userCode,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Items = transfer.Lines.Select(x => new PurchaseOrderItem
+                {
+                    ItemCode = x.ItemCode,
+                    Quantity = x.RequestedQty,
+                    ReceivedQuantity = 0,
+                    UnitCost = 0,
+                    TotalCost = 0
+                }).ToList(),
+                Histories = new List<PurchaseOrderHistory>
+                {
+                    new()
+                    {
+                        Action = PurchaseOrderHistoryAction.Created,
+                        ChangedBy = userCode,
+                        ChangedAt = now,
+                        Remarks = $"Internal PO automatically created from accepted direct transfer {transfer.RequestNo}."
+                    }
+                }
+            });
+        }
         await context.SaveChangesAsync(ct);
         logger.LogInformation("Direct transfer proposal {RequestNo} accepted by branch user {UserCode}", transfer.RequestNo, userCode);
+        var result = ToDto(transfer);
+        result.LinkedPoNo = await context.PurchaseOrders.AsNoTracking()
+            .Where(x => x.TransferRequestId == transfer.TransferRequestId)
+            .Select(x => x.PoNo)
+            .SingleAsync(ct);
+        return result;
+    }
+
+    public async Task<StockTransferRequestDto> BranchRejectAsync(long id, BranchTransferDecisionDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default)
+    {
+        var transfer = await RequestAsync(id, ct);
+        if (transfer.Status != StockTransferStatus.AwaitingBranch) throw new ConflictException("Only transfers awaiting branch acceptance can be rejected by a branch.");
+        var destination = await WarehouseAsync(transfer.DestinationWarehouseCode, ct);
+        if (!IsGlobalRole(role) && !string.Equals(destination.BranchCode, userBranchCode, StringComparison.OrdinalIgnoreCase)) throw new ForbiddenAppException("You can only reject transfers for your assigned branch.");
+
+        transfer.Status = StockTransferStatus.Rejected;
+        transfer.UpdatedAt = DateTime.UtcNow;
+        transfer.Remarks = Clean(request.Remarks) ?? transfer.Remarks;
+        await context.SaveChangesAsync(ct);
+        logger.LogInformation("Direct transfer proposal {RequestNo} rejected by branch user {UserCode}", transfer.RequestNo, userCode);
         return ToDto(transfer);
     }
 
@@ -238,6 +337,16 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
     }
 
     private async Task<Warehouse> WarehouseAsync(string code, CancellationToken ct) => await context.Warehouses.SingleOrDefaultAsync(x => x.WarehouseCode == code.Trim(), ct) ?? throw new NotFoundException("Warehouse", code);
+    private async Task<string> GenerateNextPoNoAsync(CancellationToken ct)
+    {
+        var lastCode = await context.PurchaseOrders.AsNoTracking()
+            .Where(x => x.PoNo.StartsWith("PO"))
+            .OrderByDescending(x => x.PoNo)
+            .Select(x => x.PoNo)
+            .FirstOrDefaultAsync(ct);
+        var next = lastCode is not null && int.TryParse(lastCode[2..], out var current) ? current + 1 : 1;
+        return $"PO{next:D6}";
+    }
     private async Task<StockTransferRequest> RequestAsync(long id, CancellationToken ct) => await context.StockTransferRequests.Include(x => x.Lines).Include(x => x.SourceWarehouse).Include(x => x.DestinationWarehouse).SingleOrDefaultAsync(x => x.TransferRequestId == id, ct) ?? throw new NotFoundException("StockTransferRequest", id);
     private static bool IsGlobalRole(string? role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
     private static void EnsureWarehouseAccess(string sourceWarehouseCode, string? userWarehouseCode, string? role)

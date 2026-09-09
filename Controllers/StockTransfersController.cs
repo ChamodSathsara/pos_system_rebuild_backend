@@ -49,6 +49,13 @@ public class StockTransfersController(IStockTransferService service) : BaseApiCo
             await service.BranchAcceptAsync(id, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct),
             "Transfer accepted. It is now in the main warehouse dispatch queue."));
 
+    /// <summary>Destination branch rejects a central warehouse transfer proposal. No stock is moved.</summary>
+    [HttpPost("{id:long}/branch-reject")]
+    public async Task<IActionResult> BranchReject(long id, [FromBody] BranchTransferDecisionDto request, CancellationToken ct) =>
+        Ok(ApiResponse<StockTransferRequestDto>.SuccessResponse(
+            await service.BranchRejectAsync(id, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct),
+            "Transfer proposal rejected by the destination branch."));
+
     [HttpPost("dispatches/{dispatchId:long}/receive")]
     public async Task<IActionResult> Receive(long dispatchId, [FromBody] ReceiveStockTransferDispatchDto request, CancellationToken ct) => StatusCode(StatusCodes.Status201Created, ApiResponse<StockTransferReceiptDto>.SuccessResponse(await service.ReceiveAsync(dispatchId, request, CurrentUserCode, CurrentBranchCode, CurrentRole, ct), "Delivery received and branch stock updated."));
 
