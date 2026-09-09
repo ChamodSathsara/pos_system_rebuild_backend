@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PosApi.Configuration;
+using PosApi.Data;
 using PosApi.DTOs.Auth;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
@@ -19,19 +21,22 @@ public class AuthService : IAuthService
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
+    private readonly ApplicationDbContext _context;
 
     public AuthService(
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         IJwtTokenGenerator jwtTokenGenerator,
         IOptions<JwtSettings> jwtSettings,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        ApplicationDbContext context)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
+        _context = context;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
@@ -86,63 +91,67 @@ public class AuthService : IAuthService
             throw new UnauthorizedAppException("Refresh token is missing.");
         }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
-
-        var tokenHash = HashToken(refreshToken);
-        var existingToken = await _unitOfWork.RefreshTokens.GetByTokenHashAsync(tokenHash, cancellationToken)
-            ?? throw new UnauthorizedAppException("Invalid refresh token.");
-
-        if (existingToken.RevokedAt is not null)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            await _unitOfWork.RefreshTokens.RevokeActiveFamilyAsync(
-                existingToken.UserCode, existingToken.FamilyId, cancellationToken);
+            await using var transaction = await _unitOfWork.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+
+            var tokenHash = HashToken(refreshToken);
+            var existingToken = await _unitOfWork.RefreshTokens.GetByTokenHashAsync(tokenHash, cancellationToken)
+                ?? throw new UnauthorizedAppException("Invalid refresh token.");
+
+            if (existingToken.RevokedAt is not null)
+            {
+                await _unitOfWork.RefreshTokens.RevokeActiveFamilyAsync(
+                    existingToken.UserCode, existingToken.FamilyId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                _logger.LogWarning("Refresh token reuse detected for user {UserCode}", existingToken.UserCode);
+                throw new UnauthorizedAppException("Refresh token reuse detected. Please sign in again.");
+            }
+
+            if (existingToken.ExpiresAt <= DateTime.UtcNow || existingToken.User is null || !existingToken.User.IsActive)
+            {
+                throw new UnauthorizedAppException("Refresh token is expired or the account is inactive.");
+            }
+
+            var newRefreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
+            var newRefreshTokenHash = HashToken(newRefreshTokenValue);
+            var revoked = await _unitOfWork.RefreshTokens.TryRevokeAsync(
+                existingToken.Id, newRefreshTokenHash, cancellationToken);
+
+            if (revoked == 0)
+            {
+                await _unitOfWork.RefreshTokens.RevokeActiveFamilyAsync(
+                    existingToken.UserCode, existingToken.FamilyId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                _logger.LogWarning("Concurrent refresh token reuse detected for user {UserCode}", existingToken.UserCode);
+                throw new UnauthorizedAppException("Refresh token reuse detected. Please sign in again.");
+            }
+
+            var refreshTokenExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays);
+            await _unitOfWork.RefreshTokens.AddAsync(new RefreshToken
+            {
+                UserCode = existingToken.UserCode,
+                TokenHash = newRefreshTokenHash,
+                FamilyId = existingToken.FamilyId,
+                ExpiresAt = refreshTokenExpiresAt,
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+            var (accessToken, accessTokenExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(existingToken.User);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            _logger.LogWarning("Refresh token reuse detected for user {UserCode}", existingToken.UserCode);
-            throw new UnauthorizedAppException("Refresh token reuse detected. Please sign in again.");
-        }
 
-        if (existingToken.ExpiresAt <= DateTime.UtcNow || existingToken.User is null || !existingToken.User.IsActive)
-        {
-            throw new UnauthorizedAppException("Refresh token is expired or the account is inactive.");
-        }
-
-        var newRefreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
-        var newRefreshTokenHash = HashToken(newRefreshTokenValue);
-        var revoked = await _unitOfWork.RefreshTokens.TryRevokeAsync(
-            existingToken.Id, newRefreshTokenHash, cancellationToken);
-
-        if (revoked == 0)
-        {
-            await _unitOfWork.RefreshTokens.RevokeActiveFamilyAsync(
-                existingToken.UserCode, existingToken.FamilyId, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            _logger.LogWarning("Concurrent refresh token reuse detected for user {UserCode}", existingToken.UserCode);
-            throw new UnauthorizedAppException("Refresh token reuse detected. Please sign in again.");
-        }
-
-        var refreshTokenExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays);
-        await _unitOfWork.RefreshTokens.AddAsync(new RefreshToken
-        {
-            UserCode = existingToken.UserCode,
-            TokenHash = newRefreshTokenHash,
-            FamilyId = existingToken.FamilyId,
-            ExpiresAt = refreshTokenExpiresAt,
-            CreatedAt = DateTime.UtcNow
-        }, cancellationToken);
-
-        var (accessToken, accessTokenExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(existingToken.User);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        return new LoginResponseDto
-        {
-            AccessToken = accessToken,
-            AccessTokenExpiresAt = accessTokenExpiresAt,
-            RefreshToken = newRefreshTokenValue,
-            RefreshTokenExpiresAt = refreshTokenExpiresAt,
-            User = MapToCurrentUserDto(existingToken.User)
-        };
+            return new LoginResponseDto
+            {
+                AccessToken = accessToken,
+                AccessTokenExpiresAt = accessTokenExpiresAt,
+                RefreshToken = newRefreshTokenValue,
+                RefreshTokenExpiresAt = refreshTokenExpiresAt,
+                User = MapToCurrentUserDto(existingToken.User)
+            };
+        });
     }
 
     public async Task LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default)
