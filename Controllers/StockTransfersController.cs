@@ -15,6 +15,10 @@ public class StockTransfersController(IStockTransferService service) : BaseApiCo
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? sourceWarehouseCode, [FromQuery] string? destinationWarehouseCode, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<StockTransferRequestDto>>.SuccessResponse(await service.GetRequestsAsync(sourceWarehouseCode, destinationWarehouseCode, ct)));
 
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetById(long id, CancellationToken ct) =>
+        Ok(ApiResponse<StockTransferRequestDto>.SuccessResponse(await service.GetRequestByIdAsync(id, ct)));
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateStockTransferRequestDto request, CancellationToken ct)
     {

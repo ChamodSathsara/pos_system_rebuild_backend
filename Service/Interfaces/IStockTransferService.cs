@@ -6,6 +6,7 @@ public interface IStockTransferService
 {
     Task<StockTransferRequestDto> CreateAsync(CreateStockTransferRequestDto request, string userCode, string? userBranchCode, string? role, CancellationToken ct = default);
     Task<IReadOnlyList<StockTransferRequestDto>> GetRequestsAsync(string? sourceWarehouseCode, string? destinationWarehouseCode, CancellationToken ct = default);
+    Task<StockTransferRequestDto> GetRequestByIdAsync(long id, CancellationToken ct = default);
     Task<StockTransferRequestDto> AcceptAsync(long id, AcceptStockTransferRequestDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default);
     Task<StockTransferDispatchDto> DispatchAsync(long id, CreateStockTransferDispatchDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default);
     Task<StockTransferDispatchDto> DirectDispatchAsync(CreateDirectStockTransferDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default);

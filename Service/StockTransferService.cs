@@ -39,10 +39,24 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
 
     public async Task<IReadOnlyList<StockTransferRequestDto>> GetRequestsAsync(string? sourceWarehouseCode, string? destinationWarehouseCode, CancellationToken ct = default)
     {
-        var query = context.StockTransferRequests.AsNoTracking().Include(x => x.Lines).AsQueryable();
+        var query = context.StockTransferRequests.AsNoTracking().Include(x => x.Lines).Include(x => x.SourceWarehouse).Include(x => x.DestinationWarehouse).AsQueryable();
         if (!string.IsNullOrWhiteSpace(sourceWarehouseCode)) query = query.Where(x => x.SourceWarehouseCode == sourceWarehouseCode.Trim());
         if (!string.IsNullOrWhiteSpace(destinationWarehouseCode)) query = query.Where(x => x.DestinationWarehouseCode == destinationWarehouseCode.Trim());
         return (await query.OrderByDescending(x => x.CreatedAt).ToListAsync(ct)).Select(ToDto).ToList();
+    }
+
+    public async Task<StockTransferRequestDto> GetRequestByIdAsync(long id, CancellationToken ct = default)
+    {
+        var transfer = await context.StockTransferRequests.AsNoTracking()
+            .Include(x => x.SourceWarehouse)
+            .Include(x => x.DestinationWarehouse)
+            .Include(x => x.Lines)
+            .Include(x => x.Dispatches).ThenInclude(x => x.Lines).ThenInclude(x => x.TransferRequestLine)
+            .Include(x => x.Dispatches).ThenInclude(x => x.Lines).ThenInclude(x => x.StockBatch)
+            .SingleOrDefaultAsync(x => x.TransferRequestId == id, ct)
+            ?? throw new NotFoundException("StockTransferRequest", id);
+
+        return ToDto(transfer);
     }
 
     public async Task<StockTransferRequestDto> AcceptAsync(long id, AcceptStockTransferRequestDto request, string userCode, string? userWarehouseCode, string? role, CancellationToken ct = default)
@@ -233,6 +247,6 @@ public class StockTransferService(ApplicationDbContext context, ILogger<StockTra
         if (string.IsNullOrWhiteSpace(userWarehouseCode) || !string.Equals(sourceWarehouseCode, userWarehouseCode, StringComparison.OrdinalIgnoreCase)) throw new ForbiddenAppException("You can only process requests assigned to your warehouse.");
     }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static StockTransferRequestDto ToDto(StockTransferRequest x) => new() { TransferRequestId = x.TransferRequestId, RequestNo = x.RequestNo, SourceWarehouseCode = x.SourceWarehouseCode, DestinationWarehouseCode = x.DestinationWarehouseCode, Status = x.Status, RequestDate = x.RequestDate, RequiredDate = x.RequiredDate, Remarks = x.Remarks, Lines = x.Lines.Select(l => new StockTransferRequestLineDto { TransferRequestLineId = l.TransferRequestLineId, ItemCode = l.ItemCode, RequestedQty = l.RequestedQty, ApprovedQty = l.ApprovedQty, DispatchedQty = l.DispatchedQty, ReceivedQty = l.ReceivedQty, Remarks = l.Remarks }).ToList() };
-    private static StockTransferDispatchDto ToDto(StockTransferDispatch x) => new() { DispatchId = x.DispatchId, DispatchNo = x.DispatchNo, TransferRequestId = x.TransferRequestId, DispatchedAt = x.DispatchedAt, VehicleNo = x.VehicleNo, DriverName = x.DriverName, Lines = x.Lines.Select(l => new StockTransferDispatchLineDto { DispatchLineId = l.DispatchLineId, TransferRequestLineId = l.TransferRequestLineId, BatchId = l.BatchId, Quantity = l.Quantity, UnitCost = l.UnitCost }).ToList() };
+    private static StockTransferRequestDto ToDto(StockTransferRequest x) => new() { TransferRequestId = x.TransferRequestId, RequestNo = x.RequestNo, SourceWarehouseCode = x.SourceWarehouseCode, SourceWarehouseName = x.SourceWarehouse?.WarehouseName, DestinationWarehouseCode = x.DestinationWarehouseCode, DestinationWarehouseName = x.DestinationWarehouse?.WarehouseName, Status = x.Status, RequestDate = x.RequestDate, RequiredDate = x.RequiredDate, Remarks = x.Remarks, Lines = x.Lines.Select(l => new StockTransferRequestLineDto { TransferRequestLineId = l.TransferRequestLineId, ItemCode = l.ItemCode, RequestedQty = l.RequestedQty, ApprovedQty = l.ApprovedQty, DispatchedQty = l.DispatchedQty, ReceivedQty = l.ReceivedQty, Remarks = l.Remarks }).ToList(), Dispatches = x.Dispatches.Select(ToDto).OrderByDescending(d => d.DispatchedAt).ToList() };
+    private static StockTransferDispatchDto ToDto(StockTransferDispatch x) => new() { DispatchId = x.DispatchId, DispatchNo = x.DispatchNo, TransferRequestId = x.TransferRequestId, DispatchedAt = x.DispatchedAt, VehicleNo = x.VehicleNo, DriverName = x.DriverName, Lines = x.Lines.Select(l => new StockTransferDispatchLineDto { DispatchLineId = l.DispatchLineId, TransferRequestLineId = l.TransferRequestLineId, ItemCode = l.TransferRequestLine?.ItemCode ?? string.Empty, BatchId = l.BatchId, BatchNo = l.StockBatch?.BatchNo, Quantity = l.Quantity, UnitCost = l.UnitCost, SellingPrice = l.StockBatch?.SellingPrice ?? 0, ExpiryDate = l.StockBatch?.ExpiryDate }).ToList() };
 }
