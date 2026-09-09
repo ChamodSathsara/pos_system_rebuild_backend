@@ -14,6 +14,7 @@ public class GrnMasterConfiguration : IEntityTypeConfiguration<GrnMaster>
         builder.Property(x => x.GrnNo).HasColumnName("grn_no").HasMaxLength(50);
         builder.Property(x => x.PoNo).HasColumnName("po_no").HasMaxLength(50);
         builder.Property(x => x.VendorId).HasColumnName("vendor_id");
+        builder.Property(x => x.DispatchId).HasColumnName("dispatch_id");
         builder.Property(x => x.BranchCode).HasColumnName("branch_code").HasMaxLength(50);
         builder.Property(x => x.WarehouseCode).HasColumnName("warehouse_code").HasMaxLength(50);
         builder.Property(x => x.GrnDate).HasColumnName("grn_date");
@@ -26,6 +27,7 @@ public class GrnMasterConfiguration : IEntityTypeConfiguration<GrnMaster>
 
         builder.HasOne(x => x.PurchaseOrder).WithMany(x => x.GrnMasters).HasForeignKey(x => x.PoNo).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Vendor).WithMany(x => x.GrnMasters).HasForeignKey(x => x.VendorId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Dispatch).WithMany().HasForeignKey(x => x.DispatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchCode).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Warehouse).WithMany().HasForeignKey(x => x.WarehouseCode).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ReceivedByUser).WithMany().HasForeignKey(x => x.ReceivedBy).OnDelete(DeleteBehavior.Restrict);
@@ -41,6 +43,7 @@ public class GrnItemConfiguration : IEntityTypeConfiguration<GrnItem>
         builder.Property(x => x.GrnItemId).HasColumnName("grn_item_id").ValueGeneratedOnAdd();
         builder.Property(x => x.GrnId).HasColumnName("grn_id");
         builder.Property(x => x.ItemCode).HasColumnName("item_code").HasMaxLength(50);
+        builder.Property(x => x.DispatchLineId).HasColumnName("dispatch_line_id");
         builder.Property(x => x.Quantity).HasColumnName("quantity").HasColumnType("decimal(18,3)");
         builder.Property(x => x.UnitCost).HasColumnName("unit_cost").HasColumnType("decimal(18,2)");
         builder.Property(x => x.TotalCost).HasColumnName("total_cost").HasColumnType("decimal(18,2)");
@@ -49,6 +52,7 @@ public class GrnItemConfiguration : IEntityTypeConfiguration<GrnItem>
 
         builder.HasOne(x => x.GrnMaster).WithMany(x => x.Items).HasForeignKey(x => x.GrnId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ItemCode).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.DispatchLine).WithMany().HasForeignKey(x => x.DispatchLineId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

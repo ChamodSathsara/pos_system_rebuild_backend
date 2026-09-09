@@ -8,6 +8,7 @@ public class GrnMaster
     public string? GrnNo { get; set; }
     public string? PoNo { get; set; }
     public int? VendorId { get; set; }
+    public long? DispatchId { get; set; }
     public string? BranchCode { get; set; }
     public string? WarehouseCode { get; set; }
     public DateTime? GrnDate { get; set; }
@@ -20,6 +21,7 @@ public class GrnMaster
 
     public PurchaseOrder? PurchaseOrder { get; set; }
     public Vendor? Vendor { get; set; }
+    public StockTransferDispatch? Dispatch { get; set; }
     public Branch? Branch { get; set; }
     public Warehouse? Warehouse { get; set; }
     public SystemUser? ReceivedByUser { get; set; }
@@ -32,6 +34,7 @@ public class GrnItem
     public int GrnItemId { get; set; }
     public int? GrnId { get; set; }
     public string? ItemCode { get; set; }
+    public long? DispatchLineId { get; set; }
     public decimal? Quantity { get; set; }
     public decimal? UnitCost { get; set; }
     public decimal? TotalCost { get; set; }
@@ -40,6 +43,7 @@ public class GrnItem
 
     public GrnMaster? GrnMaster { get; set; }
     public ProductMaster? Product { get; set; }
+    public StockTransferDispatchLine? DispatchLine { get; set; }
     public ICollection<GrnReturnItem> GrnReturnItems { get; set; } = new List<GrnReturnItem>();
 }
 

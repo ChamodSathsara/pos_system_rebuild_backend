@@ -3,6 +3,7 @@ namespace PosApi.DTOs.Grn;
 public class CreateGrnItemLineDto
 {
     public string ItemCode { get; set; } = string.Empty;
+    public long? DispatchLineId { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
     /// <summary>Selling price for this received batch; may differ between batches.</summary>
@@ -41,6 +42,7 @@ public class GrnItemDto
     public int GrnItemId { get; set; }
     public int? GrnId { get; set; }
     public string? ItemCode { get; set; }
+    public long? DispatchLineId { get; set; }
     public string? ItemName { get; set; }
     public decimal? Quantity { get; set; }
     public decimal? UnitCost { get; set; }
@@ -55,6 +57,7 @@ public class GrnDto
     public string? GrnNo { get; set; }
     public string? PoNo { get; set; }
     public int? VendorId { get; set; }
+    public long? DispatchId { get; set; }
     public string? VendorCode { get; set; }
     public string? VendorName { get; set; }
     public string? BranchCode { get; set; }

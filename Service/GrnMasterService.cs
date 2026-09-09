@@ -63,6 +63,7 @@ public class GrnMasterService : IGrnMasterService
         }
 
         var isInternalPo = order.IsInternalTransfer && !string.IsNullOrWhiteSpace(order.SourceWarehouseCode);
+        StockTransferDispatch? internalDispatch = null;
         if (!isInternalPo)
         {
             if (order.VendorId is null) throw new ConflictException($"Purchase order '{request.PoNo}' has no vendor assigned.");
@@ -77,6 +78,8 @@ public class GrnMasterService : IGrnMasterService
             if (!order.TransferRequestId.HasValue) throw new ConflictException("This internal PO has no linked central dispatch request.");
             var transfer = await _context.StockTransferRequests.SingleOrDefaultAsync(x => x.TransferRequestId == order.TransferRequestId.Value, cancellationToken);
             if (transfer is null || transfer.Status != StockTransferStatus.Dispatched) throw new ConflictException("Central warehouse must dispatch this internal PO before branch GRN can be posted.");
+            internalDispatch = await _context.StockTransferDispatches.Include(x => x.Lines).SingleOrDefaultAsync(x => x.TransferRequestId == transfer.TransferRequestId, cancellationToken)
+                ?? throw new ConflictException("No dispatch exists for this internal PO.");
         }
 
         var branchCode = request.BranchCode.Trim();
@@ -133,9 +136,17 @@ public class GrnMasterService : IGrnMasterService
             var totalCost = line.Quantity * line.UnitCost;
             grnTotal += totalCost;
 
+            if (isInternalPo)
+            {
+                if (!line.DispatchLineId.HasValue) throw new BadRequestException("DispatchLineId is required for every Internal PO GRN item.");
+                var dispatchLine = internalDispatch!.Lines.SingleOrDefault(x => x.DispatchLineId == line.DispatchLineId.Value)
+                    ?? throw new BadRequestException("DispatchLineId does not belong to the linked dispatch.");
+                if (dispatchLine.TransferRequestLineId <= 0 || dispatchLine.Quantity < line.Quantity || dispatchLine.BatchId <= 0) throw new BadRequestException("GRN quantity exceeds the dispatched quantity.");
+            }
             grnItems.Add(new GrnItem
             {
                 ItemCode = line.ItemCode,
+                DispatchLineId = line.DispatchLineId,
                 Quantity = line.Quantity,
                 UnitCost = line.UnitCost,
                 TotalCost = totalCost,
@@ -154,6 +165,7 @@ public class GrnMasterService : IGrnMasterService
             GrnNo = grnNo,
             PoNo = request.PoNo,
             VendorId = order.VendorId,
+            DispatchId = internalDispatch?.DispatchId,
             BranchCode = branchCode,
             WarehouseCode = warehouseCode,
             GrnDate = grnDate,
@@ -264,6 +276,33 @@ public class GrnMasterService : IGrnMasterService
             Remarks = $"GRN {grnNo} received against PO {request.PoNo}: {grnItems.Count} item(s), total {grnTotal:N2}.",
             Changes = historyChanges
         }, cancellationToken);
+
+        // Internal PO GRN is the receipt event. It updates the linked dispatch/transfer in the
+        // same SaveChanges transaction as the GRN, batches and branch stock.
+        if (isInternalPo)
+        {
+            var transfer = await _context.StockTransferRequests.Include(x => x.Lines).SingleAsync(x => x.TransferRequestId == order.TransferRequestId!.Value, cancellationToken);
+            var receipt = await _context.StockTransferReceipts.Include(x => x.Lines).SingleOrDefaultAsync(x => x.DispatchId == internalDispatch!.DispatchId, cancellationToken);
+            if (receipt is null)
+            {
+                receipt = new StockTransferReceipt { ReceiptNo = $"TRN{DateTime.UtcNow:yyyyMMddHHmmssfff}", DispatchId = internalDispatch.DispatchId, ReceivedBy = receivedBy, ReceivedAt = DateTime.UtcNow, Remarks = $"GRN {grnNo}" };
+                _context.StockTransferReceipts.Add(receipt);
+            }
+            foreach (var item in grnItems)
+            {
+                var dispatchLine = internalDispatch.Lines.Single(x => x.DispatchLineId == item.DispatchLineId!.Value);
+                var alreadyReceived = await _context.Set<GrnItem>().Where(x => x.DispatchLineId == dispatchLine.DispatchLineId).SumAsync(x => x.Quantity ?? 0, cancellationToken);
+                if (alreadyReceived + (item.Quantity ?? 0) > dispatchLine.Quantity) throw new ConflictException("GRN quantity exceeds the remaining dispatched quantity.");
+                var receiptLine = receipt.Lines.SingleOrDefault(x => x.DispatchLineId == dispatchLine.DispatchLineId);
+                if (receiptLine is null) receipt.Lines.Add(new StockTransferReceiptLine { DispatchLineId = dispatchLine.DispatchLineId, ReceivedQty = item.Quantity ?? 0, DamagedQty = 0, ShortQty = 0, Remarks = $"GRN {grnNo}" });
+                else receiptLine.ReceivedQty += item.Quantity ?? 0;
+                var transferLine = transfer.Lines.Single(x => x.TransferRequestLineId == dispatchLine.TransferRequestLineId);
+                transferLine.ReceivedQty += item.Quantity ?? 0;
+            }
+            receipt.ReceivedAt = DateTime.UtcNow;
+            transfer.Status = transfer.Lines.All(x => x.ReceivedQty >= x.DispatchedQty) ? StockTransferStatus.Received : StockTransferStatus.Dispatched;
+            transfer.UpdatedAt = DateTime.UtcNow;
+        }
 
         // ---- 8. vendor_ledger ----
         if (!isInternalPo)
