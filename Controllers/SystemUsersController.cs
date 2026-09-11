@@ -14,7 +14,7 @@ namespace PosApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/system-users")]
-[Authorize(Roles = RoleConstants.Admin)]
+[Authorize(Roles = $"{RoleConstants.Admin},{RoleConstants.BranchManager}")]
 public class SystemUsersController : BaseApiController
 {
     private readonly ISystemUserService _systemUserService;
@@ -31,7 +31,7 @@ public class SystemUsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<SystemUserDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var users = await _systemUserService.GetAllAsync(cancellationToken);
+        var users = await _systemUserService.GetAllAsync(CurrentRole, CurrentBranchCode, cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<SystemUserDto>>.SuccessResponse(users));
     }
 
@@ -43,7 +43,7 @@ public class SystemUsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByCode(string userCode, CancellationToken cancellationToken)
     {
-        var user = await _systemUserService.GetByCodeAsync(userCode, cancellationToken);
+        var user = await _systemUserService.GetByCodeAsync(userCode, CurrentRole, CurrentBranchCode, cancellationToken);
         return Ok(ApiResponse<SystemUserDto>.SuccessResponse(user));
     }
 
@@ -57,7 +57,7 @@ public class SystemUsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateSystemUserDto request, CancellationToken cancellationToken)
     {
-        var user = await _systemUserService.CreateAsync(request, cancellationToken);
+        var user = await _systemUserService.CreateAsync(request, CurrentRole, CurrentBranchCode, cancellationToken);
 
         return CreatedAtAction(
             nameof(GetByCode),
@@ -74,7 +74,7 @@ public class SystemUsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(string userCode, [FromBody] UpdateSystemUserDto request, CancellationToken cancellationToken)
     {
-        var user = await _systemUserService.UpdateAsync(userCode, request, cancellationToken);
+        var user = await _systemUserService.UpdateAsync(userCode, request, CurrentRole, CurrentBranchCode, cancellationToken);
         return Ok(ApiResponse<SystemUserDto>.SuccessResponse(user, "System user updated successfully."));
     }
 
@@ -86,7 +86,7 @@ public class SystemUsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string userCode, CancellationToken cancellationToken)
     {
-        await _systemUserService.DeleteAsync(userCode, cancellationToken);
+        await _systemUserService.DeleteAsync(userCode, CurrentRole, CurrentBranchCode, cancellationToken);
         return Ok(ApiResponse.SuccessResponse("System user deleted successfully."));
     }
 }

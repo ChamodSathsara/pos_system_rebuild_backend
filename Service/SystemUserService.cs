@@ -1,4 +1,5 @@
 using AutoMapper;
+using PosApi.Constants;
 using PosApi.DTOs.Security;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
@@ -11,6 +12,7 @@ namespace PosApi.Service;
 public class SystemUserService : ISystemUserService
 {
     private const string CodePrefix = "USR";
+    private static readonly string[] BranchManagedRoles = [RoleConstants.Cashier, RoleConstants.BranchManager];
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
@@ -29,22 +31,39 @@ public class SystemUserService : ISystemUserService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<SystemUserDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SystemUserDto>> GetAllAsync(string? callerRole, string? callerBranchCode, CancellationToken cancellationToken = default)
     {
-        var users = await _unitOfWork.Users.GetAllWithRoleAsync(cancellationToken);
+        var users = IsBranchManager(callerRole)
+            ? await _unitOfWork.Users.GetBranchUsersWithRolesAsync(RequireBranch(callerBranchCode), BranchManagedRoles, cancellationToken)
+            : await _unitOfWork.Users.GetAllWithRoleAsync(cancellationToken);
         return _mapper.Map<IReadOnlyList<SystemUserDto>>(users);
     }
 
-    public async Task<SystemUserDto> GetByCodeAsync(string userCode, CancellationToken cancellationToken = default)
+    public async Task<SystemUserDto> GetByCodeAsync(string userCode, string? callerRole, string? callerBranchCode, CancellationToken cancellationToken = default)
     {
         var user = await _unitOfWork.Users.GetByUserCodeWithRoleAsync(userCode, cancellationToken)
             ?? throw new NotFoundException("SystemUser", userCode);
 
+        EnsureBranchManagerCanManage(user, callerRole, callerBranchCode);
+
         return _mapper.Map<SystemUserDto>(user);
     }
 
-    public async Task<SystemUserDto> CreateAsync(CreateSystemUserDto request, CancellationToken cancellationToken = default)
+    public async Task<SystemUserDto> CreateAsync(CreateSystemUserDto request, string? callerRole, string? callerBranchCode, CancellationToken cancellationToken = default)
     {
+        if (IsBranchManager(callerRole))
+        {
+            var branchCode = RequireBranch(callerBranchCode);
+            if (!string.IsNullOrWhiteSpace(request.BranchCode)
+                && !string.Equals(request.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ForbiddenAppException("You can only create users for your assigned branch.");
+            }
+
+            await EnsureBranchManagedRoleAsync(request.RoleId, cancellationToken);
+            request.BranchCode = branchCode;
+        }
+
         var userCode = request.UserCode?.Trim();
 
         if (string.IsNullOrWhiteSpace(userCode))
@@ -103,10 +122,26 @@ public class SystemUserService : ISystemUserService
         return _mapper.Map<SystemUserDto>(created);
     }
 
-    public async Task<SystemUserDto> UpdateAsync(string userCode, UpdateSystemUserDto request, CancellationToken cancellationToken = default)
+    public async Task<SystemUserDto> UpdateAsync(string userCode, UpdateSystemUserDto request, string? callerRole, string? callerBranchCode, CancellationToken cancellationToken = default)
     {
         var user = await _unitOfWork.Users.GetByIdAsync(userCode, cancellationToken)
             ?? throw new NotFoundException("SystemUser", userCode);
+
+        if (IsBranchManager(callerRole))
+        {
+            var existing = await _unitOfWork.Users.GetByUserCodeWithRoleAsync(userCode, cancellationToken)
+                ?? throw new NotFoundException("SystemUser", userCode);
+            EnsureBranchManagerCanManage(existing, callerRole, callerBranchCode);
+            await EnsureBranchManagedRoleAsync(request.RoleId, cancellationToken);
+
+            var branchCode = RequireBranch(callerBranchCode);
+            if (!string.IsNullOrWhiteSpace(request.BranchCode)
+                && !string.Equals(request.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ForbiddenAppException("You can only assign users to your own branch.");
+            }
+            request.BranchCode = branchCode;
+        }
 
         if (!string.IsNullOrWhiteSpace(request.BranchCode)
             && !await _unitOfWork.Branches.BranchCodeExistsAsync(request.BranchCode, cancellationToken))
@@ -144,10 +179,12 @@ public class SystemUserService : ISystemUserService
         return _mapper.Map<SystemUserDto>(updated);
     }
 
-    public async Task DeleteAsync(string userCode, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(string userCode, string? callerRole, string? callerBranchCode, CancellationToken cancellationToken = default)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(userCode, cancellationToken)
+        var user = await _unitOfWork.Users.GetByUserCodeWithRoleAsync(userCode, cancellationToken)
             ?? throw new NotFoundException("SystemUser", userCode);
+
+        EnsureBranchManagerCanManage(user, callerRole, callerBranchCode);
 
         _unitOfWork.Users.Remove(user);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -165,5 +202,41 @@ public class SystemUserService : ISystemUserService
             .Max() + 1;
 
         return $"{CodePrefix}{nextSequence:D5}";
+    }
+
+    private static bool IsBranchManager(string? role) =>
+        string.Equals(role, RoleConstants.BranchManager, StringComparison.OrdinalIgnoreCase);
+
+    private static string RequireBranch(string? branchCode) =>
+        !string.IsNullOrWhiteSpace(branchCode)
+            ? branchCode
+            : throw new ForbiddenAppException("Your Branch Manager account is not assigned to a branch.");
+
+    private static void EnsureBranchManagerCanManage(SystemUser user, string? callerRole, string? callerBranchCode)
+    {
+        if (!IsBranchManager(callerRole)) return;
+
+        var branchCode = RequireBranch(callerBranchCode);
+        if (!string.Equals(user.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase)
+            || user.Role is null
+            || !BranchManagedRoles.Contains(user.Role.RoleName, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenAppException("You can only manage Cashier and Branch Manager users in your assigned branch.");
+        }
+    }
+
+    private async Task EnsureBranchManagedRoleAsync(int? roleId, CancellationToken cancellationToken)
+    {
+        if (!roleId.HasValue)
+        {
+            throw new BadRequestException("Role is required. Branch Managers can assign only Cashier or Branch_Manager roles.");
+        }
+
+        var role = await _unitOfWork.UserRoles.GetByIdAsync(roleId.Value, cancellationToken);
+        if (role is null || role.RoleId is not (2 or 3)
+            || !BranchManagedRoles.Contains(role.RoleName, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenAppException("Branch Managers can assign only Cashier or Branch_Manager roles.");
+        }
     }
 }

@@ -20,4 +20,9 @@ public interface IUserRepository : IGenericRepository<SystemUser, string>
     /// Loads every system_user together with its role (needed so list views can show RoleName).
     /// </summary>
     Task<IReadOnlyList<SystemUser>> GetAllWithRoleAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SystemUser>> GetBranchUsersWithRolesAsync(
+        string branchCode,
+        IReadOnlyCollection<string> roleNames,
+        CancellationToken cancellationToken = default);
 }

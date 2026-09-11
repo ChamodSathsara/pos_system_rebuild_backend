@@ -4,7 +4,7 @@ namespace PosApi.Service.Interfaces;
 
 public interface IUserRoleService
 {
-    Task<IReadOnlyList<UserRoleDto>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserRoleDto>> GetAllAsync(string? callerRole, CancellationToken cancellationToken = default);
     Task<UserRoleDto> GetByIdAsync(int roleId, CancellationToken cancellationToken = default);
     Task<UserRoleWithPermissionsDto> GetByIdWithPermissionsAsync(int roleId, CancellationToken cancellationToken = default);
     Task<UserRoleDto> CreateAsync(CreateUserRoleDto request, CancellationToken cancellationToken = default);

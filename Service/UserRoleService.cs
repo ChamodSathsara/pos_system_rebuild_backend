@@ -1,5 +1,6 @@
 using AutoMapper;
 using PosApi.DTOs.Security;
+using PosApi.Constants;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
 using PosApi.Repository;
@@ -20,9 +21,16 @@ public class UserRoleService : IUserRoleService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<UserRoleDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<UserRoleDto>> GetAllAsync(string? callerRole, CancellationToken cancellationToken = default)
     {
         var roles = await _unitOfWork.UserRoles.GetAllAsync(cancellationToken);
+        if (string.Equals(callerRole, RoleConstants.BranchManager, StringComparison.OrdinalIgnoreCase))
+        {
+            roles = roles
+                .Where(r => r.RoleId is 2 or 3
+                    && (r.RoleName == RoleConstants.Cashier || r.RoleName == RoleConstants.BranchManager))
+                .ToList();
+        }
         return _mapper.Map<IReadOnlyList<UserRoleDto>>(roles);
     }
 

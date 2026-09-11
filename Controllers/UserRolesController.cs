@@ -13,7 +13,7 @@ namespace PosApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/user-roles")]
-[Authorize(Roles = RoleConstants.Admin)]
+[Authorize(Roles = $"{RoleConstants.Admin},{RoleConstants.BranchManager}")]
 public class UserRolesController : BaseApiController
 {
     private readonly IUserRoleService _userRoleService;
@@ -30,7 +30,7 @@ public class UserRolesController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<UserRoleDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var roles = await _userRoleService.GetAllAsync(cancellationToken);
+        var roles = await _userRoleService.GetAllAsync(CurrentRole, cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<UserRoleDto>>.SuccessResponse(roles));
     }
 
@@ -38,6 +38,7 @@ public class UserRolesController : BaseApiController
     /// Retrieves a single role by id.
     /// </summary>
     [HttpGet("{roleId:int}")]
+    [Authorize(Roles = RoleConstants.Admin)]
     [ProducesResponseType(typeof(ApiResponse<UserRoleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int roleId, CancellationToken cancellationToken)
@@ -50,6 +51,7 @@ public class UserRolesController : BaseApiController
     /// Retrieves a role together with its assigned permissions.
     /// </summary>
     [HttpGet("{roleId:int}/details")]
+    [Authorize(Roles = RoleConstants.Admin)]
     [ProducesResponseType(typeof(ApiResponse<UserRoleWithPermissionsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByIdWithPermissions(int roleId, CancellationToken cancellationToken)
@@ -62,6 +64,7 @@ public class UserRolesController : BaseApiController
     /// Creates a new role.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = RoleConstants.Admin)]
     [ProducesResponseType(typeof(ApiResponse<UserRoleDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -79,6 +82,7 @@ public class UserRolesController : BaseApiController
     /// Updates an existing role.
     /// </summary>
     [HttpPut("{roleId:int}")]
+    [Authorize(Roles = RoleConstants.Admin)]
     [ProducesResponseType(typeof(ApiResponse<UserRoleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -92,6 +96,7 @@ public class UserRolesController : BaseApiController
     /// Deletes a role. Fails if it is still assigned to any system user.
     /// </summary>
     [HttpDelete("{roleId:int}")]
+    [Authorize(Roles = RoleConstants.Admin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]

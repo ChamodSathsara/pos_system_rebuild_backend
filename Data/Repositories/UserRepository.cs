@@ -39,4 +39,17 @@ public class UserRepository : GenericRepository<SystemUser, string>, IUserReposi
             .Include(u => u.Role)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SystemUser>> GetBranchUsersWithRolesAsync(
+        string branchCode,
+        IReadOnlyCollection<string> roleNames,
+        CancellationToken cancellationToken = default)
+    {
+        return await DbSet.AsNoTracking()
+            .Include(u => u.Role)
+            .Where(u => u.BranchCode == branchCode
+                && u.Role != null
+                && roleNames.Contains(u.Role.RoleName))
+            .ToListAsync(cancellationToken);
+    }
 }
