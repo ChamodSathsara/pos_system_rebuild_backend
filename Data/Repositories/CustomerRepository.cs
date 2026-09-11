@@ -13,9 +13,44 @@ public class CustomerRepository : GenericRepository<Customer, string>, ICustomer
     {
     }
 
+    public async Task<IReadOnlyList<Customer>> SearchAsync(
+        string? search,
+        bool? isActive,
+        CancellationToken cancellationToken = default)
+    {
+        var query = DbSet.AsNoTracking().AsQueryable();
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(c => c.IsActive == isActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(c =>
+                c.CustomerCode.Contains(term)
+                || c.CustomerName.Contains(term)
+                || (c.Mobile != null && c.Mobile.Contains(term))
+                || (c.Email != null && c.Email.Contains(term)));
+        }
+
+        return await query
+            .OrderBy(c => c.CustomerName)
+            .ThenBy(c => c.CustomerCode)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> CustomerCodeExistsAsync(string customerCode, CancellationToken cancellationToken = default)
     {
         return await DbSet.AsNoTracking().AnyAsync(c => c.CustomerCode == customerCode, cancellationToken);
+    }
+
+    public async Task<bool> CustomerNameExistsAsync(string customerName, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = customerName.Trim().ToUpper();
+        return await DbSet.AsNoTracking()
+            .AnyAsync(c => c.CustomerName.Trim().ToUpper() == normalizedName, cancellationToken);
     }
 
     public async Task<string> GenerateNextCustomerCodeAsync(CancellationToken cancellationToken = default)

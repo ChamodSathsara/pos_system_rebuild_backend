@@ -12,6 +12,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.HasKey(x => x.CustomerCode);
         builder.Property(x => x.CustomerCode).HasColumnName("customer_code").HasMaxLength(50);
         builder.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(100).IsRequired();
+        builder.Property(x => x.CustomerNameKey).HasColumnName("customer_name_key").HasMaxLength(100);
         builder.Property(x => x.Mobile).HasColumnName("mobile").HasMaxLength(20);
         builder.Property(x => x.Address).HasColumnName("address").HasMaxLength(255);
         builder.Property(x => x.Email).HasColumnName("email").HasMaxLength(100);
@@ -23,6 +24,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.HasIndex(x => x.Mobile);
         builder.HasIndex(x => x.Email);
+        builder.HasIndex(x => x.CustomerNameKey)
+            .IsUnique()
+            .HasFilter("[customer_name_key] IS NOT NULL");
     }
 }
 

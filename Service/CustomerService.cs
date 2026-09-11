@@ -1,4 +1,6 @@
 using AutoMapper;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using PosApi.DTOs.Customer;
 using PosApi.Exceptions;
 using PosApi.Models.Entities;
@@ -20,8 +22,23 @@ public class CustomerService : ICustomerService
         _logger = logger;
     }
 
+    public async Task<IReadOnlyList<CustomerDto>> GetAllAsync(
+        string? search,
+        bool? isActive,
+        CancellationToken cancellationToken = default)
+    {
+        var customers = await _unitOfWork.Customers.SearchAsync(search, isActive, cancellationToken);
+        return _mapper.Map<IReadOnlyList<CustomerDto>>(customers);
+    }
+
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerDto request, CancellationToken cancellationToken = default)
     {
+        var customerName = request.CustomerName.Trim();
+        if (await _unitOfWork.Customers.CustomerNameExistsAsync(customerName, cancellationToken))
+        {
+            throw new ConflictException($"A customer named '{customerName}' already exists.");
+        }
+
         var customerCode = request.CustomerCode?.Trim();
 
         if (string.IsNullOrWhiteSpace(customerCode))
@@ -36,7 +53,8 @@ public class CustomerService : ICustomerService
         var customer = new Customer
         {
             CustomerCode = customerCode,
-            CustomerName = request.CustomerName.Trim(),
+            CustomerName = customerName,
+            CustomerNameKey = customerName.ToUpperInvariant(),
             Mobile = request.Mobile,
             Address = request.Address,
             Email = request.Email,
@@ -48,7 +66,14 @@ public class CustomerService : ICustomerService
         };
 
         await _unitOfWork.Customers.AddAsync(customer, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw new ConflictException($"A customer named '{customerName}' already exists.");
+        }
 
         _logger.LogInformation("Customer {CustomerCode} created successfully", customer.CustomerCode);
 

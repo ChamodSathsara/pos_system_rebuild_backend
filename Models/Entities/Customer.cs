@@ -6,6 +6,7 @@ public class Customer
 {
     public string CustomerCode { get; set; } = null!;
     public string CustomerName { get; set; } = null!;
+    public string? CustomerNameKey { get; set; }
     public string? Mobile { get; set; }
     public string? Address { get; set; }
     public string? Email { get; set; }

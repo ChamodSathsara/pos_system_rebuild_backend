@@ -4,7 +4,13 @@ namespace PosApi.Repository;
 
 public interface ICustomerRepository : IGenericRepository<Customer, string>
 {
+    Task<IReadOnlyList<Customer>> SearchAsync(
+        string? search,
+        bool? isActive,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CustomerCodeExistsAsync(string customerCode, CancellationToken cancellationToken = default);
+    Task<bool> CustomerNameExistsAsync(string customerName, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the next sequential customer code (e.g. "CUS00001", "CUS00002", ...) for use when

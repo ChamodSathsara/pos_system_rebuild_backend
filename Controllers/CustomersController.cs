@@ -26,6 +26,20 @@ public class CustomersController : BaseApiController
     }
 
     /// <summary>
+    /// Retrieves customers ordered by name. Search matches code, name, mobile, or email.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<CustomerDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] bool? isActive,
+        CancellationToken cancellationToken)
+    {
+        var customers = await _customerService.GetAllAsync(search, isActive, cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<CustomerDto>>.SuccessResponse(customers));
+    }
+
+    /// <summary>
     /// Creates a new customer. Requires an authenticated system_user. If customerCode is
     /// omitted, one is generated automatically (e.g. CUS00001).
     /// </summary>
