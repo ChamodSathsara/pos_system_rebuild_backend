@@ -11,6 +11,7 @@ public enum StockReferenceType
     StockAdjustment,
     Damage,
     StockReceive,
+    CentralStockReceipt,
     CostCorrection
 }
 

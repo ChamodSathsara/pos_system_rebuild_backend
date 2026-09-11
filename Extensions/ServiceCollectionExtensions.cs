@@ -124,6 +124,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStockMovementService, StockMovementService>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IStockTransferService, StockTransferService>();
+        services.AddScoped<ICentralStockReceiptService, CentralStockReceiptService>();
 
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();

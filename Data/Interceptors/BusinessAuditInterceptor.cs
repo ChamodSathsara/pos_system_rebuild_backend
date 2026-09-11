@@ -23,6 +23,7 @@ public sealed class BusinessAuditInterceptor(IHttpContextAccessor httpContextAcc
         nameof(StockInventory), nameof(StockBatch), nameof(StockMovement), nameof(DamageItem),
         nameof(StockTransferRequest), nameof(StockTransferRequestLine), nameof(StockTransferDispatch),
         nameof(StockTransferDispatchLine), nameof(StockTransferReceipt), nameof(StockTransferReceiptLine),
+        nameof(CentralStockReceipt), nameof(CentralStockReceiptLine),
         nameof(Expense), nameof(ExpenseCategory)
     };
 

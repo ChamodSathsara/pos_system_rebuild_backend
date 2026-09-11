@@ -91,8 +91,7 @@ public class OpeningStockService : IOpeningStockService
         {
             throw new ConflictException(
                 $"Opening stock has already been applied to item " +
-                $"'{itemCode}' in warehouse '{warehouseCode}' and " +
-                $"warehouse '{warehouseCode}'.");
+                $"'{itemCode}' in warehouse '{warehouseCode}'. Use the Central Stock Receipt endpoint for additional central warehouse stock.");
         }
 
         if (stock.CurrentQty != 0)
