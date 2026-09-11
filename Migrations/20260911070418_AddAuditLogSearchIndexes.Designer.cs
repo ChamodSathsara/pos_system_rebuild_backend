@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PosApi.Data;
 
@@ -11,9 +12,11 @@ using PosApi.Data;
 namespace PosApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911070418_AddAuditLogSearchIndexes")]
+    partial class AddAuditLogSearchIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -665,11 +668,6 @@ namespace PosApi.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("customer_name");
 
-                    b.Property<string>("CustomerNameKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("customer_name_key");
-
                     b.Property<string>("CustomerType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -695,10 +693,6 @@ namespace PosApi.Migrations
                         .HasColumnName("mobile");
 
                     b.HasKey("CustomerCode");
-
-                    b.HasIndex("CustomerNameKey")
-                        .IsUnique()
-                        .HasFilter("[customer_name_key] IS NOT NULL");
 
                     b.HasIndex("Email");
 

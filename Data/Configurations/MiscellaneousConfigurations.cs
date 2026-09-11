@@ -270,6 +270,9 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(x => x.OldValue).HasColumnName("old_value").HasColumnType("nvarchar(max)");
         builder.Property(x => x.NewValue).HasColumnName("new_value").HasColumnType("nvarchar(max)");
         builder.Property(x => x.ActionTime).HasColumnName("action_time");
+        builder.HasIndex(x => x.ActionTime).HasDatabaseName("IX_audit_log_action_time");
+        builder.HasIndex(x => new { x.UserCode, x.ActionTime }).HasDatabaseName("IX_audit_log_user_code_action_time");
+        builder.HasIndex(x => new { x.TableName, x.ActionTime }).HasDatabaseName("IX_audit_log_table_name_action_time");
     }
 }
 

@@ -155,6 +155,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IDamageItemService, DamageItemService>();
         services.AddScoped<IItemLogService, ItemLogService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
 
         services.AddScoped<ICashierShiftService, CashierShiftService>();
 
